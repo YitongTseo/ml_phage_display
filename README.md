@@ -14,7 +14,4 @@ TODOs:
 * Expand to other data
 * Incorporate p-value score 
 * Test generative models
-* TODO: remember to fix that weird change in feature_computation in the DELPHI package:
--  def LoadPro2Vec():
-    # TODO: we're going to need to fix this...
-    f = open("../DELPHI/Feature_Computation/Pro2Vec_1D/protVec_100d_3grams.csv", "r")
+* TODO: remember to fix that weird change in feature_computation in the DELPHI package: `DELPHI/Feature_Computation/Pro2Vec_1D/compute.py:25`
