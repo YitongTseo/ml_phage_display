@@ -1,3 +1,8 @@
+import pathlib
+import sys
+HOME_DIRECTORY = pathlib.Path().absolute()
+sys.path.append(str(HOME_DIRECTORY) + '/src')
+
 from sklearn.model_selection import KFold
 import umap
 

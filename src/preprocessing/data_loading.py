@@ -1,6 +1,9 @@
 import pathlib
+import sys
+import pdb
 
 HOME_DIRECTORY = pathlib.Path().absolute()
+sys.path.append(str(HOME_DIRECTORY) + "/src")
 
 import sys
 import os
@@ -11,8 +14,15 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn.utils import shuffle
 from utils.utils import cnt_c, find_3mer
+from functools import reduce, partial
 
-from preprocessing.representation import seq_to_pro2vec, seq_to_RAA, seq_to_prop, MAX_PEPTIDE_LEN
+from preprocessing.representation import (
+    seq_to_pro2vec,
+    seq_to_RAA,
+    seq_to_prop,
+    MAX_PEPTIDE_LEN,
+)
+
 
 def read_data(datafile="12ca5-MDM2-mCDH2-R3.csv", visualize=False):
     R3_lib = pd.read_csv(os.path.join(HOME_DIRECTORY, "data", datafile))
@@ -51,13 +61,24 @@ def read_data(datafile="12ca5-MDM2-mCDH2-R3.csv", visualize=False):
     return R3_lib
 
 
-def preprocessing(R3_lib, max_len=MAX_PEPTIDE_LEN):
+def preprocessing(
+    R3_lib,
+):
+    # TODO: we should just remove these two rows with NaN samples from dataset
     R3_lib.drop([1939, 4996], inplace=True)  # drop NaN sample
-
     R3_lib["Pro2Vec"] = R3_lib.Peptide.apply(seq_to_pro2vec)
     R3_lib["RAA"] = R3_lib.Peptide.apply(seq_to_RAA)
     R3_lib["prop"] = R3_lib.Peptide.apply(seq_to_prop)
+    return R3_lib
 
+
+def build_dataset(
+    R3_lib,
+    protein_of_interest,
+    # TODO: Remove Cadherin since it's not in scope of bioarxiv submission
+    all_proteins=["12ca5", "MDM2", "mCDH2",],  
+    max_len=MAX_PEPTIDE_LEN,
+):
     pro2vec = np.stack(R3_lib["Pro2Vec"].to_numpy())
     raa = np.stack(R3_lib["RAA"].to_numpy())
     prop = np.stack(R3_lib["prop"].to_numpy())
@@ -65,51 +86,28 @@ def preprocessing(R3_lib, max_len=MAX_PEPTIDE_LEN):
     # max length = 14, padding O
     pro2vec = pro2vec.reshape(-1, max_len, 1)
     raa = raa.reshape(-1, max_len, 1)
-
     X = np.concatenate((pro2vec, raa, prop), axis=-1)
 
+    def sum_over_replicates(protein_id, replicate_idxs=(" 1", " 2", " 3")):
+        # Sums series over all three replicates of a protein specified
+        adder = partial(pd.Series.add, fill_value=0)
+        return reduce(
+            adder, [R3_lib[protein_id + idx] for idx in replicate_idxs]
+        )
+
+    other_proteins_not_of_interest = all_proteins
+    other_proteins_not_of_interest.remove(protein_of_interest)
     # Labels for neural networks
-    R3_lib["12ca5_ratio"] = (
-        R3_lib["12ca5 1"] + R3_lib["12ca5 2"] + R3_lib["12ca5 3"] + 1
+    R3_lib["poi_ratio"] = (
+        sum_over_replicates(protein_of_interest) + 1
     ) / (
-        R3_lib["mCDH2 1"]
-        + R3_lib["mCDH2 2"]
-        + R3_lib["mCDH2 3"]
-        + R3_lib["MDM2 1"]
-        + R3_lib["MDM2 2"]
-        + R3_lib["MDM2 3"]
-        + 1
+        sum_over_replicates(other_proteins_not_of_interest[0]) +
+        sum_over_replicates(other_proteins_not_of_interest[1]) + 
+        1
     )
-    R3_lib["12ca5_log_ratio"] = R3_lib["12ca5_ratio"].apply(np.log)
+    R3_lib["poi_log_ratio"] = R3_lib["poi_ratio"].apply(np.log)
+    y = R3_lib["poi_log_ratio"]
 
-    R3_lib["mCDH2_ratio"] = (
-        R3_lib["mCDH2 1"] + R3_lib["mCDH2 2"] + R3_lib["mCDH2 3"] + 1
-    ) / (
-        R3_lib["12ca5 1"]
-        + R3_lib["12ca5 2"]
-        + R3_lib["12ca5 3"]
-        + R3_lib["MDM2 1"]
-        + R3_lib["MDM2 2"]
-        + R3_lib["MDM2 3"]
-        + 1
-    )
-    R3_lib["mCDH2_log_ratio"] = R3_lib["mCDH2_ratio"].apply(np.log)
-
-    R3_lib["mdm2_ratio"] = (
-        R3_lib["MDM2 1"] + R3_lib["MDM2 2"] + R3_lib["MDM2 3"] + 1
-    ) / (
-        R3_lib["12ca5 1"]
-        + R3_lib["12ca5 2"]
-        + R3_lib["12ca5 3"]
-        + R3_lib["mCDH2 1"]
-        + R3_lib["mCDH2 2"]
-        + R3_lib["mCDH2 3"]
-        + 1
-    )
-    R3_lib["mdm2_log_ratio"] = R3_lib["mdm2_ratio"].apply(np.log)
-
-    # BIG TODO: Unhardcode MDM2 from the learning task
-    y = R3_lib["mdm2_log_ratio"]
     # Cast as binary classification task
     y = np.array(list(y.apply(lambda e: e > 0)))
     X, y = shuffle(X, y, random_state=0)
