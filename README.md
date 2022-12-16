@@ -6,7 +6,7 @@ To setup:
     * (For the sake of scrapiness actually already have it downloaded so skip this step, we'll move it out of this directory later)
 
 To run:
-* For now, go into src and run notebook. later we'll create a argparse runner 
+* `python src/runner.py` 
 
 
 TODOs:
