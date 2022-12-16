@@ -7,7 +7,7 @@ import os
 sys.path.append(os.path.join(pathlib.Path().absolute(), "DELPHI/Feature_Computation"))
 import numpy as np
 import Pro2Vec_1D.compute as Pro2Vec
-from utils.representation_utils import (
+from preprocessing.representation_utils import (
     initialize_Proc2Vec_embeddings,
     initialize_RAAs,
     initialize_physiochemical_properties,

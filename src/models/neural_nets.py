@@ -106,6 +106,7 @@ def train(
     X,
     y,
     model_architecture=RNN,
+    n_splits=5
 ):
     def scheduler(epoch, lr):
         if epoch < 5:
@@ -115,7 +116,8 @@ def train(
     callback = keras.callbacks.LearningRateScheduler(scheduler)
 
     trained_models = []
-    kf = KFold(n_splits=5)
+    if n_splits > 1:
+        kf = KFold(n_splits=5)
     accs, pres, recs = [], [], []
     for train_index, test_index in kf.split(X):
         X_train, X_test = X[train_index], X[test_index]
