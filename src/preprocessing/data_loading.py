@@ -73,7 +73,9 @@ def build_dataset(
     if dataset_type == DATASET_TYPE.BINARY_CLASSIFICATION:
         y = formulate_binary_classification_labels(lib, protein_of_interest)
     elif dataset_type == DATASET_TYPE.LOG_FOLD_REGRESSION:
-        y = formulate_single_channel_regression_labels(lib, protein_of_interest)
+        y = formulate_two_channel_regression_labels(
+            lib, protein_of_interest, other_protein
+        )
         # Remove nans ... aka when p-value = 0
         X = X[~np.isnan(y).any(axis=1)]
         y = y[~np.isnan(y).any(axis=1)]
