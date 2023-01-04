@@ -186,3 +186,72 @@ class RegressionExperiment(BinaryClassificationExperiment):
             )
 
         return model
+    
+    
+    
+    class SingleRegressionExperiment(BinaryClassificationExperiment):
+    def predict(self, model, X_test, y_true):
+        y_pred = model(X_test)
+        return (
+            y_pred,
+                {
+                    "mse": np.mean(fold_rmse(y_true, y_pred)),
+            },
+        )
+    
+
+    def train(
+        self,
+        X_train,
+        y_train,
+        model_architecture,
+        optimizer=keras.optimizers.Adam(learning_rate=0.001),
+        load_trained_model=False,
+        validation_split=0.1,
+    ):
+        def scheduler(epoch, lr):
+            if epoch < 5:
+                return lr
+            else:
+                return lr * tf.math.exp(-0.1)
+
+        lr_scheduler = keras.callbacks.LearningRateScheduler(scheduler)
+        es_scheduler = keras.callbacks.EarlyStopping(
+            monitor="val_loss", mode="min", verbose=1, patience=3
+        )
+        mc_scheduler = keras.callbacks.ModelCheckpoint(
+            "best_model.h5", monitor="val_loss", mode="min"
+        )
+
+        if validation_split > 0:
+            (X_train, X_val, y_train, y_val) = train_test_split(
+                X_train,
+                y_train,
+                test_size=validation_split,
+                shuffle=True,
+                random_state=5,
+            )
+        else:
+            (X_val, y_val) = (np.array([]), np.array([]))
+
+        if load_trained_model:
+            model = keras.models.load_model(
+                "best_model.h5", custom_objects={"fold_rmse": fold_rmse}
+            )
+        else:
+            model = model_architecture(optimizer)
+            model.fit(
+                x=X_train,
+                y=y_train,
+                validation_data=(X_val, y_val),
+                batch_size=128,
+                epochs=16,
+                verbose="auto",
+                initial_epoch=0,
+                validation_freq=1,
+                use_multiprocessing=False,
+                callbacks=[lr_scheduler, es_scheduler, mc_scheduler],
+            )
+
+        return model
+
