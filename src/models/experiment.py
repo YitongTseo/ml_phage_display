@@ -189,13 +189,13 @@ class RegressionExperiment(BinaryClassificationExperiment):
     
     
     
-    class SingleRegressionExperiment(BinaryClassificationExperiment):
+class SingleRegressionExperiment(BinaryClassificationExperiment):
     def predict(self, model, X_test, y_true):
         y_pred = model(X_test)
         return (
             y_pred,
                 {
-                    "mse": np.mean(fold_rmse(y_true, y_pred)),
+                    "mse": np.mean(rmse(y_true, y_pred)),
             },
         )
     
@@ -236,7 +236,7 @@ class RegressionExperiment(BinaryClassificationExperiment):
 
         if load_trained_model:
             model = keras.models.load_model(
-                "best_model.h5", custom_objects={"fold_rmse": fold_rmse}
+                "best_model.h5", custom_objects={"rmse": rmse}
             )
         else:
             model = model_architecture(optimizer)
