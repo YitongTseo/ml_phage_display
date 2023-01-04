@@ -7,18 +7,18 @@ import pdb
 def rmse(y_true, y_pred):
     return tf.reduce_mean(tf.square(y_true - y_pred))
     
+
 def p_value_rmse(y_true, y_pred):
-    return tf.reduce_mean(tf.square(y_true - y_pred)[:, 0])
+    return tf.reduce_mean(tf.square(y_true - y_pred))
 
 
 def fold_rmse(y_true, y_pred):
-    return tf.reduce_mean(tf.square(y_true - y_pred)[:, 1])
+    return tf.reduce_mean(tf.square(y_true - y_pred))
 
 
 def two_channel_mse(y_true, y_pred):
     squared_difference = tf.square(y_true - y_pred)
     return tf.reduce_mean(squared_difference, axis=-1)
-
 
 def RegressionRNN(optimizer):
     # create model
@@ -60,6 +60,8 @@ def RegressionRNN(optimizer):
     )
     return model
 
+
+
 def SingleRegressionRNN(optimizer):
     # create model
     model = Sequential()
@@ -94,8 +96,8 @@ def SingleRegressionRNN(optimizer):
     # Compile model
     model.compile(
         optimizer=optimizer,
-        loss=two_channel_mse,
-        metrics=rmse,
+        loss="mse",
+        metrics=[fold_rmse],
         run_eagerly=True,
     )
     return model
@@ -112,8 +114,11 @@ def BinaryClassificationRNN(optimizer):
     model.add(layers.Dense(1, activation="sigmoid"))
     # Compile model
     model.compile(
-        loss="binary_crossentropy",
+        loss="mse",
         optimizer=optimizer,
         metrics=["accuracy", Recall(), Precision()],
     )
     return model
+
+
+
