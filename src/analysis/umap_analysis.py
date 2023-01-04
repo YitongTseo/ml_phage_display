@@ -35,7 +35,7 @@ def UMAP_log_Fold(embedding, y_train):
   ax = sns.scatterplot(
     x=embedding[:, 0],
     y=embedding[:, 1],
-    hue=y_train[:,1], alpha=0.1)
+    hue=y_train, alpha=0.1)
   plt.title("RNN embedding UMAP, label with log FC value")
 
 
