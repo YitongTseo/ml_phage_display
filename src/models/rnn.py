@@ -4,7 +4,9 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.metrics import Recall, Precision
 import pdb
 
-
+def rmse(y_true, y_pred):
+    return tf.reduce_mean(tf.square(y_true - y_pred))
+    
 def p_value_rmse(y_true, y_pred):
     return tf.reduce_mean(tf.square(y_true - y_pred)[:, 0])
 
@@ -54,6 +56,46 @@ def RegressionRNN(optimizer):
         optimizer=optimizer,
         loss=two_channel_mse,
         metrics=[two_channel_mse, fold_rmse, p_value_rmse],
+        run_eagerly=True,
+    )
+    return model
+
+def SingleRegressionRNN(optimizer):
+    # create model
+    model = Sequential()
+    model.add(layers.Dense(16))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Activation(activations.tanh))
+    model.add(layers.Dropout(0.01))
+
+    model.add(layers.Bidirectional(layers.LSTM(16)))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Activation(activations.tanh))
+    model.add(layers.Dropout(0.01))
+
+    model.add(layers.Dense(16))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Activation(activations.tanh))
+    model.add(layers.Dropout(0.01))
+
+    model.add(layers.Dense(8))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Activation(activations.tanh))
+    model.add(layers.Dropout(0.01))
+
+    model.add(layers.Dense(4, activation="tanh"))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Activation(activations.tanh))
+    model.add(layers.Dropout(0.01))
+
+    model.add(
+        layers.Dense(1, activation=None, kernel_initializer="normal", use_bias=True)
+    )
+    # Compile model
+    model.compile(
+        optimizer=optimizer,
+        loss=two_channel_mse,
+        metrics=rmse,
         run_eagerly=True,
     )
     return model
