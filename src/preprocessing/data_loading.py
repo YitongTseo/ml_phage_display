@@ -28,10 +28,13 @@ from preprocessing.X_representation import (
     MAX_PEPTIDE_LEN,
 )
 
-# TODO(Yitong): Enforce FEATURE_LIST to the actual order 
+# TODO(Yitong): Enforce FEATURE_LIST to the actual order
+# BIG TODO(Yitong): We need to find the missing feature names!
 FEATURE_LIST = [
     "Pro2Vec",
     "RAA",
+    "TODO: missing feature 1!",
+    "TODO: missing feature 2!",
     "hydrophobicity",
     "hydrophilicity",
     "net charge index of side chains",
@@ -45,6 +48,7 @@ FEATURE_LIST = [
     "turns",
     "antigenicity",
 ]
+
 
 class DATASET_TYPE(Enum):
     BINARY_CLASSIFICATION = 1

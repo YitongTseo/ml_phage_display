@@ -14,8 +14,10 @@ import numpy as np
 import shap
 import pdb
 from preprocessing.X_representation import MAX_PEPTIDE_LEN
+from preprocessing.data_loading import FEATURE_LIST
+import itertools
 
-AA_FEATURE_DIM = 16
+AA_FEATURE_DIM = len(FEATURE_LIST)
 
 
 def shapley_analysis(model, X, investigate_X):
@@ -42,8 +44,7 @@ def shapley_analysis(model, X, investigate_X):
 
     encoded_X = encode_X(X)
     encoded_investigate_X = encode_X(investigate_X)
-    pdb.set_trace()
-    # assert all(X == decode_X(encoded_X))
+    assert (X == decode_X(encoded_X)).all()
 
     # Here we select 50 samples for the "typical" feature values (used for calculating out features)
     # TODO(Yitong): Also see what it would be like to use kmeans function for calculating out features...
@@ -54,19 +55,27 @@ def shapley_analysis(model, X, investigate_X):
     # Then use 100 perterbation samples to estimate the SHAP values for a given prediction
     # Note that this requires 100 * 50 evaluations of the model.
     explainer = shap.KernelExplainer(f, summary)
-    encoded_shap_values = explainer.shap_values(encoded_investigate_X, nsamples=100)
-    shap_values = encode_X(encoded_shap_values)
-    pdb.set_trace()
+    encoded_shap_values = explainer.shap_values(encoded_investigate_X, nsamples=100)[0]
 
-    if len(investigate_X) == 1:
+    if len(encoded_investigate_X) == 1:
         shap.force_plot(
             explainer.expected_value,
-            shap_values[0],
-            features=encoded_investigate_X,
-            feature_names=["a"] * 224,
+            decode_X(encoded_shap_values).sum(axis=1)[0],
+            features=decode_X(encoded_investigate_X).mean(axis=1)[0],
+            feature_names=FEATURE_LIST,
             matplotlib=True,
             show=True,
         )
+        # shap.force_plot(
+        #     explainer.expected_value,
+        #     decode_X(encoded_shap_values).sum(axis=1)[0],
+        #     features=encoded_investigate_X,
+        #     feature_names=FEATURE_LIST,
+        #     matplotlib=True,
+        #     show=True,
+        # )
+                    # feature_names=[y + ' ' + str(x) for (x, y) in itertools.product(range(MAX_PEPTIDE_LEN), FEATURE_LIST)],
+
         pdb.set_trace()
     else:
         shap.summary_plot(shap_values, encoded_investigate_X)
