@@ -28,6 +28,23 @@ from preprocessing.X_representation import (
     MAX_PEPTIDE_LEN,
 )
 
+# TODO(Yitong): Enforce FEATURE_LIST to the actual order 
+FEATURE_LIST = [
+    "Pro2Vec",
+    "RAA",
+    "hydrophobicity",
+    "hydrophilicity",
+    "net charge index of side chains",
+    "polarity",
+    "polarizability",
+    "SASA: solvent-accessible surface area",
+    "volume of side chains",
+    "flexibility",
+    "accessibility",
+    "exposed",
+    "turns",
+    "antigenicity",
+]
 
 class DATASET_TYPE(Enum):
     BINARY_CLASSIFICATION = 1
@@ -68,11 +85,13 @@ def build_dataset(
     # max length = 14, padding O
     pro2vec = pro2vec.reshape(-1, max_len, 1)
     raa = raa.reshape(-1, max_len, 1)
+    # TODO(Yitong): Here is where FEATURE_LIST should be tied to
     X = np.concatenate((pro2vec, raa, prop), axis=-1)
 
     if dataset_type == DATASET_TYPE.BINARY_CLASSIFICATION:
         y = formulate_binary_classification_labels(lib, protein_of_interest)
     elif dataset_type == DATASET_TYPE.LOG_FOLD_REGRESSION:
+        # TODO(Yitong): Does this make sense to be joint channel regression?
         y = formulate_two_channel_regression_labels(
             lib, protein_of_interest, other_protein
         )

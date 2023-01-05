@@ -1,7 +1,8 @@
 import pathlib
 import sys
+
 HOME_DIRECTORY = pathlib.Path().absolute()
-sys.path.append(str(HOME_DIRECTORY) + '/src')
+sys.path.append(str(HOME_DIRECTORY) + "/src")
 
 import umap
 import numpy as np
@@ -15,67 +16,77 @@ import umap
 
 
 def embedding_classification(model, X_train):
-  nn_emb = model.layers[2](model.layers[1](model.layers[0](X_train)))
-  reducer = umap.UMAP(n_neighbors=10,
-                    min_dist=0.1,
-                    n_components=2)
-  reduced_emb = reducer.fit_transform(nn_emb)
-  return reduced_emb
-  
+    nn_emb = model.layers[2](model.layers[1](model.layers[0](X_train)))
+    reducer = umap.UMAP(n_neighbors=10, min_dist=0.1, n_components=2)
+    reduced_emb = reducer.fit_transform(nn_emb)
+    return reduced_emb
+
+
 def embedding_regression(model, X_train):
-  nn_emb =  model.layers[11](model.layers[10](model.layers[9](model.layers[8](model.layers[7](model.layers[6](model.layers[5](model.layers[4](model.layers[3](model.layers[2](model.layers[1](model.layers[0](X_train))))))))))))
-  reducer = umap.UMAP(n_neighbors=10,
-                    min_dist=0.1,
-                    n_components=2)
-  reduced_emb = reducer.fit_transform(nn_emb)
-  return reduced_emb
+    nn_emb = model.layers[11](
+        model.layers[10](
+            model.layers[9](
+                model.layers[8](
+                    model.layers[7](
+                        model.layers[6](
+                            model.layers[5](
+                                model.layers[4](
+                                    model.layers[3](
+                                        model.layers[2](
+                                            model.layers[1](model.layers[0](X_train))
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    )
+    reducer = umap.UMAP(n_neighbors=10, min_dist=0.1, n_components=2)
+    reduced_emb = reducer.fit_transform(nn_emb)
+    return reduced_emb
+
 
 # tests label with FC value
 def UMAP_log_Fold(embedding, y_train):
-  ax = sns.scatterplot(
-    x=embedding[:, 0],
-    y=embedding[:, 1],
-    hue=y_train, alpha=0.1)
-  plt.title("RNN embedding UMAP, label with log FC value")
+    ax = sns.scatterplot(x=embedding[:, 0], y=embedding[:, 1], hue=y_train, alpha=0.1)
+    plt.title("RNN embedding UMAP, label with log FC value")
 
 
 # label with binary log FC value
 def UMAP_binary_log_Fold(embedding, y_train):
-  ax = sns.scatterplot(
-      x=embedding[:, 0],
-      y=embedding[:, 1],
-      hue=y_train>0, alpha=0.1)
-  plt.title("RNN embedding UMAP, label with binary log FC value")
-  
+    ax = sns.scatterplot(
+        x=embedding[:, 0], y=embedding[:, 1], hue=y_train > 0, alpha=0.1
+    )
+    plt.title("RNN embedding UMAP, label with binary log FC value")
 
-# tests label with -log P value 
+
+# tests label with -log P value
 def UMAP_log_P(embedding, z_train):
-  ax = sns.scatterplot(
-      x=embedding[:, 0],
-      y=embedding[:, 1],
-      hue=-z_train, alpha=0.1)
-  plt.title("RNN embedding UMAP, label with - log P value")
-  
-  
-# tests label with binary -log P value 
+    ax = sns.scatterplot(x=embedding[:, 0], y=embedding[:, 1], hue=-z_train, alpha=0.1)
+    plt.title("RNN embedding UMAP, label with - log P value")
+
+
+# tests label with binary -log P value
 def UMAP_binary_log_P(embedding, z_train):
-  ax = sns.scatterplot(
-      x=embedding[:, 0],
-      y=embedding[:, 1],
-      hue=-z_train>-np.log10(0.05), alpha=0.1)
-  plt.title("RNN embedding UMAP, label with binary - log P value")
-  
-  
-# testslabel with both log FC and -log P value 
-def UMAP_joint(embedding, y_train,z_train):
-  ax = sns.scatterplot(
-      x=embedding[:, 0],
-      y=embedding[:, 1],
-      hue=(y_train>0)*(-z_train>-np.log10(0.05)), alpha=0.1)
-  plt.title("RNN embedding UMAP, label with both log FC and - log P value")
-  
-  
- 
+    ax = sns.scatterplot(
+        x=embedding[:, 0], y=embedding[:, 1], hue=-z_train > -np.log10(0.05), alpha=0.1
+    )
+    plt.title("RNN embedding UMAP, label with binary - log P value")
+
+
+# testslabel with both log FC and -log P value
+def UMAP_joint(embedding, y_train, z_train):
+    ax = sns.scatterplot(
+        x=embedding[:, 0],
+        y=embedding[:, 1],
+        hue=(y_train > 0) * (-z_train > -np.log10(0.05)),
+        alpha=0.1,
+    )
+    plt.title("RNN embedding UMAP, label with both log FC and - log P value")
+
 
 # nn_emb = model.layers[2](model.layers[1](model.layers[0](X_train)))
 # reducer = umap.UMAP(n_neighbors=10,

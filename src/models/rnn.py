@@ -114,7 +114,8 @@ def BinaryClassificationRNN(optimizer):
     model.add(layers.Dense(1, activation="sigmoid"))
     # Compile model
     model.compile(
-        loss="mse",
+        loss="binary_crossentropy",
+        # loss="mse",
         optimizer=optimizer,
         metrics=["accuracy", Recall(), Precision()],
     )
