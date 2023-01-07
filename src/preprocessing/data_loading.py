@@ -106,10 +106,15 @@ def build_dataset(
         # Remove negative infinity ... aka when p-value = 1
         X = X[~(y == -np.inf).any(axis=1)]
         y = y[~(y == -np.inf).any(axis=1)]
-
+        # log p-value into -log p-value 
+        y[:,0]=-y[:,0]
+        
         # Normalize
         scaler = StandardScaler()
-        y = scaler.fit_transform(y)
+        scaler.fit(y)
+        y= scaler.transform(y)
+        log_P_5percent, log_FC_zero = scaler.transform([[-np.log10(0.05),0]])[0]
+        print(" - log P value cutoff is {}, and log FC value cutoff is {}".format(log_P_5percent, log_FC_zero))
 
     elif dataset_type == DATASET_TYPE.JOINT_REGRESSION:
         y = formulate_two_channel_regression_labels(
@@ -122,10 +127,16 @@ def build_dataset(
         # Remove negative infinity ... aka when p-value = 1
         X = X[~(y == -np.inf).any(axis=1)]
         y = y[~(y == -np.inf).any(axis=1)]
-
+        
+        # log p-value into -log p-value 
+        y[:,0]=-y[:,0]
+        
         # Normalize
         scaler = StandardScaler()
-        y = scaler.fit_transform(y)
+        scaler.fit(y)
+        y= scaler.transform(y)
+        log_P_5percent, log_FC_zero = scaler.transform([[-np.log10(0.05),0]])[0]
+        print(" - log P value cutoff is {}, and log FC value cutoff is {}".format(log_P_5percent, log_FC_zero))
 
     assert (
         len(np.argwhere(np.isnan(y))) == 0
