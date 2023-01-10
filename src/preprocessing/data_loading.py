@@ -27,27 +27,13 @@ from preprocessing.X_representation import (
     seq_to_prop,
     MAX_PEPTIDE_LEN,
 )
+from itertools import compress
+from preprocessing.X_representation_utils import AA_PROPERTY_ORDERING
 
-# TODO(Yitong): Enforce FEATURE_LIST to the actual order
-# BIG TODO(Yitong): We need to find the missing feature names!
 FEATURE_LIST = [
     "Pro2Vec",
     "RAA",
-    "TODO: missing feature 1!",
-    "TODO: missing feature 2!",
-    "hydrophobicity",
-    "hydrophilicity",
-    "net charge index of side chains",
-    "polarity",
-    "polarizability",
-    "SASA: solvent-accessible surface area",
-    "volume of side chains",
-    "flexibility",
-    "accessibility",
-    "exposed",
-    "turns",
-    "antigenicity",
-]
+] + AA_PROPERTY_ORDERING
 
 
 class DATASET_TYPE(Enum):
@@ -85,61 +71,51 @@ def build_dataset(
     pro2vec = np.stack(lib["Pro2Vec"].to_numpy())
     raa = np.stack(lib["RAA"].to_numpy())
     prop = np.stack(lib["prop"].to_numpy())
+    peptides = lib["Peptide"].to_list()
 
     # max length = 14, padding O
     pro2vec = pro2vec.reshape(-1, max_len, 1)
     raa = raa.reshape(-1, max_len, 1)
-    # TODO(Yitong): Here is where FEATURE_LIST should be tied to
+    assert FEATURE_LIST.index("Pro2Vec") == 0 and FEATURE_LIST.index("RAA") == 1
+    # Concat Pro2Vec as the first element, RAA as the second element, and properties as elements 3-16
     X = np.concatenate((pro2vec, raa, prop), axis=-1)
+    # TODO(Yitong): Do we want to normalize X?
 
     if dataset_type == DATASET_TYPE.BINARY_CLASSIFICATION:
         y = formulate_binary_classification_labels(lib, protein_of_interest)
-    elif dataset_type == DATASET_TYPE.LOG_FOLD_REGRESSION:
-        # TODO(Yitong): Does this make sense to be joint channel regression?
+    elif dataset_type in (
+        # TODO(Yitong): We dont need both of these when they do the same thing...
+        DATASET_TYPE.LOG_FOLD_REGRESSION,
+        DATASET_TYPE.JOINT_REGRESSION,
+    ):
         y = formulate_two_channel_regression_labels(
             lib, protein_of_interest, other_protein
         )
         # Remove nans ... aka when p-value = 0
-        X = X[~np.isnan(y).any(axis=1)]
-        y = y[~np.isnan(y).any(axis=1)]
-
+        nans_mask = ~np.isnan(y).any(axis=1)
         # Remove negative infinity ... aka when p-value = 1
-        X = X[~(y == -np.inf).any(axis=1)]
-        y = y[~(y == -np.inf).any(axis=1)]
-        # log p-value into -log p-value 
-        y[:,0]=-y[:,0]
-        
+        neg_inf_mask = ~(y == -np.inf).any(axis=1)
+        mask = np.logical_and(nans_mask, neg_inf_mask)
+        X = X[mask]
+        peptides = list(compress(peptides, mask))
+        y = y[mask]
+
+        # log p-value into -log p-value
+        y[:, 0] = -y[:, 0]
+
         # Normalize
         scaler = StandardScaler()
         scaler.fit(y)
-        y= scaler.transform(y)
-        log_P_5percent, log_FC_zero = scaler.transform([[-np.log10(0.05),0]])[0]
-        print(" - log P value cutoff is {}, and log FC value cutoff is {}".format(log_P_5percent, log_FC_zero))
-
-    elif dataset_type == DATASET_TYPE.JOINT_REGRESSION:
-        y = formulate_two_channel_regression_labels(
-            lib, protein_of_interest, other_protein
+        y = scaler.transform(y)
+        log_P_5percent, log_FC_zero = scaler.transform([[-np.log10(0.05), 0]])[0]
+        print(
+            " - log P value cutoff is {}, and log FC value cutoff is {}".format(
+                log_P_5percent, log_FC_zero
+            )
         )
-        # Remove nans ... aka when p-value = 0
-        X = X[~np.isnan(y).any(axis=1)]
-        y = y[~np.isnan(y).any(axis=1)]
-
-        # Remove negative infinity ... aka when p-value = 1
-        X = X[~(y == -np.inf).any(axis=1)]
-        y = y[~(y == -np.inf).any(axis=1)]
-        
-        # log p-value into -log p-value 
-        y[:,0]=-y[:,0]
-        
-        # Normalize
-        scaler = StandardScaler()
-        scaler.fit(y)
-        y= scaler.transform(y)
-        log_P_5percent, log_FC_zero = scaler.transform([[-np.log10(0.05),0]])[0]
-        print(" - log P value cutoff is {}, and log FC value cutoff is {}".format(log_P_5percent, log_FC_zero))
 
     assert (
         len(np.argwhere(np.isnan(y))) == 0
     ), "we dont want any nans in our y-label dataset"
-    X, y = shuffle(X, y, random_state=0)
-    return X, y
+    X, y, peptides = shuffle(X, y, peptides, random_state=0)
+    return X, y, peptides
