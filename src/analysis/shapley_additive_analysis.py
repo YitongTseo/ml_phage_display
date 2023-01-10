@@ -83,6 +83,8 @@ def shapley_analysis(
     X,
     investigation_target,
     investigation_type=INVESTIGATION_TYPE.BY_FEATURE,
+    num_background_samples=100,
+    num_perturbation_samples=1000,
 ):
     shap.initjs()
     investigate_X = np.array([x[0] for x in investigation_target])
@@ -110,20 +112,25 @@ def shapley_analysis(
     encoded_investigate_X = encode_X(investigate_X)
     assert (X == decode_X(encoded_X)).all()
 
-    # Here we select 100 samples for the "typical" feature values (used for calculating out features)
+    # Here we select "num_background_samples" samples for the "typical" feature values (used for calculating out features)
     # TODO(Yitong): Also see what it would be like to use kmeans function for calculating out features...
     np.random.seed(0)
-    inds = np.random.choice(encoded_X.shape[0], 100, replace=False)
+    inds = np.random.choice(encoded_X.shape[0], num_background_samples, replace=False)
     summary = encoded_X[inds, :]
 
-    # Then use 1000 perterbation samples to estimate the SHAP values for a given prediction
-    # Note that this requires 100 * 1000 evaluations of the model.
+    # Then use "num_perturbation_samples" perterbation samples to estimate the SHAP values for a given prediction
+    # Note that this requires (num_background_samples * num_perturbation_samples) evaluations of the model.
     explainer = shap.KernelExplainer(f, summary)
-    encoded_shap_values = explainer.shap_values(encoded_investigate_X, nsamples=1000)[0]
+    encoded_shap_values = explainer.shap_values(
+        encoded_investigate_X, nsamples=num_perturbation_samples
+    )[0]
     shap_values = decode_X(encoded_shap_values)
 
     if len(encoded_investigate_X) == 1:
+        print("Expected value: ", explainer.expected_value)
+        print("Does this match the sum of shapely values? ", shap_values.sum())
         if investigation_type == INVESTIGATION_TYPE.BY_FEATURE:
+            print('Yitong: The expected value here might not really make sense?')
             shap.force_plot(
                 explainer.expected_value,
                 shap_values.sum(axis=1)[0],
@@ -196,43 +203,5 @@ def shapley_analysis(
         cohort_analysis(4)
         cohort_analysis(5)
         cohort_analysis(6)
-
-        # shap.plots.bar(explanation)# max_display=max_display)
-        # shap.plots.scatter(explanation[:, "Capital Gain"])
-
-        # pdb.set_trace()
-        # shap.plots.bar(explanation)
-
-        # https://shap.readthedocs.io/en/latest/example_notebooks/api_examples/plots/bar.html
-        # TODO: this will be really good for passing in what we think are different mechanisms of action...
-
-        # TODO: Plot a bar graph with the amino acids as the x label and shap_values as the y..
-
-        # shap.force_plot(
-        #     explainer.expected_value,
-        #     shap_values.sum(axis=2)[0],
-        #     features=encoded_investigate_X,
-        #     feature_names=FEATURE_LIST,
-        #     matplotlib=True,
-        #     show=True,
-        # )
-        # pdb.set_trace()
-        # shap.summary_plot(shap_values, features)
-        # shap.plots.waterfall(explanation[0], max_display=14)
-
-    # # shap_values50 = explainer.shap_values(encoded_X[280:330, :], nsamples=500)
-    # # shap.dependence_plot("alcohol", shap_values[0], encoded_X[:1])
-
-    # # p = shap.force_plot(explainer.expected_value, shap_values, X_display.iloc[299, :])
-
-    # shap_values = explainer.shap_values(X)
-    # i = 4
-    # # shap.partial_dependence_plot(
-    # #     "MedInc", model.predict, X100, ice=False,
-    # #     model_expected_value=True, feature_expected_value=True
-    # # )
-
-    # shap.summary_plot(shap_values, features=X, feature_names=X.columns)
-    # shap.summary_plot(shap_values, features=X, feature_names=X.columns, plot_type="bar")
-    # # # the waterfall_plot shows how we get from shap_values.base_values to model.predict(X)[sample_ind]
-    # shap.plots.waterfall(shap_values[0], max_display=14)
+        pdb.set_trace()
+        print('what now bub?')
