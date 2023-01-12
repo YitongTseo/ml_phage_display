@@ -128,6 +128,7 @@ def shapley_analysis(
 
     if len(encoded_investigate_X) == 1:
         print("Expected value: ", explainer.expected_value)
+        print("Model eval: ", model(investigate_X))
         print("Does this match the sum of shapely values? ", shap_values.sum())
         if investigation_type == INVESTIGATION_TYPE.BY_FEATURE:
             print('Yitong: The expected value here might not really make sense?')

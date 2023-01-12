@@ -1,26 +1,28 @@
 import tensorflow as tf
 from tensorflow.keras import layers, activations
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.metrics import Recall, Precision
+from tensorflow.keras.metrics import Recall, Precision, mean_squared_error
 import pdb
 
-def rmse(y_true, y_pred):
-    return tf.reduce_mean(tf.square(y_true - y_pred))
-    
 
 def p_value_rmse(y_true, y_pred):
-    return tf.reduce_mean(tf.square(y_true - y_pred))
+    y_true_pvalue = y_true[:, 0]
+    y_pred_pvalue = y_pred[:, 0]
+    return mean_squared_error(y_true_pvalue, y_pred_pvalue)
 
 
 def fold_rmse(y_true, y_pred):
-    return tf.reduce_mean(tf.square(y_true - y_pred))
+    y_true_fold = y_true[:, 1]
+    y_pred_fold = y_pred[:, 1]
+    return mean_squared_error(y_true_fold, y_pred_fold)
 
 
 def two_channel_mse(y_true, y_pred):
+    # scales are not similar
     squared_difference = tf.square(y_true - y_pred)
     return tf.reduce_mean(squared_difference, axis=-1)
 
-def RegressionRNN(optimizer):
+def TwoChannelRegressionRNN(optimizer):
     # create model
     model = Sequential()
     model.add(layers.Dense(16))
@@ -62,7 +64,7 @@ def RegressionRNN(optimizer):
 
 
 
-def SingleRegressionRNN(optimizer):
+def SingleChannelRegressionRNN(optimizer):
     # create model
     model = Sequential()
     model.add(layers.Dense(16))
@@ -97,7 +99,7 @@ def SingleRegressionRNN(optimizer):
     model.compile(
         optimizer=optimizer,
         loss="mse",
-        metrics=[fold_rmse],
+        metrics=[mean_squared_error],
         run_eagerly=True,
     )
     return model

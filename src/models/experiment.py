@@ -12,8 +12,8 @@ from sklearn.metrics import confusion_matrix
 from typing import Optional, Any
 from dataclasses import dataclass
 from sklearn.model_selection import train_test_split
-from models.rnn import two_channel_mse, rmse
-
+from models.rnn import two_channel_mse, p_value_rmse, fold_rmse
+from tensorflow.keras.metrics import mean_squared_error
 
 @dataclass
 class Result:
@@ -23,7 +23,76 @@ class Result:
     y_true: Optional[np.array] = None
 
 
-class BinaryClassificationExperiment:
+class Experiment:
+    def run_adhoc_experiment(
+        self,
+        X,
+        y,
+        model_architecture,
+        test_train_split=0.2,
+        load_trained_model=False,
+        model_save_name=None,
+        optimizer=keras.optimizers.Adam(learning_rate=0.001)
+    ):
+        (X_train, X_test, y_train, y_test) = train_test_split(
+            X,
+            y,
+            test_size=test_train_split,
+            shuffle=True,
+            random_state=5,
+        )
+        model = self.train(
+            X_train,
+            y_train,
+            model_architecture,
+            load_trained_model=load_trained_model,
+            model_save_name=model_save_name,
+            optimizer=optimizer,
+        )
+        y_pred, metrics = self.predict(model, X_test, y_test)
+        return Result(
+            trained_model=model,
+            metrics=metrics,
+            y_pred=y_pred,
+            y_true=y_test,
+        )
+
+    def run_cross_validation_experiment(self, X, y, model_architecture, n_splits=5):
+        kf = KFold(n_splits=n_splits)
+        results = []
+        for train_index, test_index in kf.split(X):
+            X_train, X_test = X[train_index], X[test_index]
+            y_train, y_test = y[train_index], y[test_index]
+            model = self.train(
+                X_train,
+                y_train,
+                model_architecture,
+            )
+            y_pred, metrics = self.predict(model, X_test, y_test)
+            results.append(
+                Result(
+                    trained_model=model,
+                    metrics=metrics,
+                    y_pred=y_pred,
+                    y_true=y_test,
+                )
+            )
+        return results
+
+    def train():
+        pass
+
+    def predict():
+        pass
+
+
+class BinaryClassificationExperiment(Experiment):
+    epochs = 16 
+
+    def __init__(self, epochs=16) -> None:
+        super().__init__()
+        self.epochs = epochs
+
     def train(
         self,
         X_train,
@@ -32,6 +101,8 @@ class BinaryClassificationExperiment:
         optimizer=keras.optimizers.Adam(learning_rate=0.001),
         load_trained_model=False,
         validation_split=0.1,
+        # TODO: yitong do something with model_save_name but dont let experiment over write it...
+        model_save_name=None
     ):
         def scheduler(epoch, lr):
             if epoch < 5:
@@ -67,7 +138,7 @@ class BinaryClassificationExperiment:
                 y=y_train,
                 validation_data=(X_val, y_val),
                 batch_size=128,
-                epochs=16,
+                epochs=self.epochs,
                 verbose="auto",
                 initial_epoch=0,
                 # class_weight={1: 0.5, 0: 0.5},
@@ -97,54 +168,8 @@ class BinaryClassificationExperiment:
             },
         )
 
-    def run_adhoc_experiment(
-        self, X, y, model_architecture, test_train_split=0.2, load_trained_model=False
-    ):
-        (X_train, X_test, y_train, y_test) = train_test_split(
-            X,
-            y,
-            test_size=test_train_split,
-            shuffle=True,
-            random_state=5,
-        )
-        model = self.train(
-            X_train,
-            y_train,
-            model_architecture,
-            load_trained_model=load_trained_model,
-        )
-        y_pred, metrics = self.predict(model, X_test, y_test)
-        return Result(
-            trained_model=model,
-            metrics=metrics,
-            y_pred=y_pred,
-            y_true=y_test,
-        )
 
-    def run_cross_validation_experiment(self, X, y, model_architecture, n_splits=5):
-        kf = KFold(n_splits=n_splits)
-        results = []
-        for train_index, test_index in kf.split(X):
-            X_train, X_test = X[train_index], X[test_index]
-            y_train, y_test = y[train_index], y[test_index]
-            model = self.train(
-                X_train,
-                y_train,
-                model_architecture,
-            )
-            y_pred, metrics = self.predict(model, X_test, y_test)
-            results.append(
-                Result(
-                    trained_model=model,
-                    metrics=metrics,
-                    y_pred=y_pred,
-                    y_true=y_test,
-                )
-            )
-        return results
-
-
-class RegressionExperiment(BinaryClassificationExperiment):
+class TwoChannelRegressionExperiment(Experiment):
     def predict(self, model, X_test, y_true):
         y_pred = model(X_test)
         return (
@@ -162,6 +187,7 @@ class RegressionExperiment(BinaryClassificationExperiment):
         optimizer=keras.optimizers.Adam(learning_rate=0.001),
         load_trained_model=False,
         validation_split=0.1,
+        model_save_name=None
     ):
         def scheduler(epoch, lr):
             if epoch < 5:
@@ -191,7 +217,11 @@ class RegressionExperiment(BinaryClassificationExperiment):
         if load_trained_model:
             model = keras.models.load_model(
                 "best_two_channel_regression_model.h5",
-                custom_objects={"two_channel_mse": two_channel_mse},
+                custom_objects={
+                    "two_channel_mse": two_channel_mse,
+                    "fold_rmse": fold_rmse,
+                    "p_value_rmse": p_value_rmse,
+                },
             )
         else:
             model = model_architecture(optimizer)
@@ -211,13 +241,13 @@ class RegressionExperiment(BinaryClassificationExperiment):
         return model
 
 
-class SingleRegressionExperiment(BinaryClassificationExperiment):
+class SingleChannelRegressionExperiment(Experiment):
     def predict(self, model, X_test, y_true):
         y_pred = model(X_test)
         return (
             y_pred,
             {
-                "mse": np.mean(rmse(y_true, y_pred)),
+                "mse": mean_squared_error(y_true, y_pred),
             },
         )
 
@@ -229,6 +259,7 @@ class SingleRegressionExperiment(BinaryClassificationExperiment):
         optimizer=keras.optimizers.Adam(learning_rate=0.001),
         load_trained_model=False,
         validation_split=0.1,
+        model_save_name="best_fc_single_channel_regression_model.h5",
     ):
         def scheduler(epoch, lr):
             if epoch < 5:
@@ -241,7 +272,7 @@ class SingleRegressionExperiment(BinaryClassificationExperiment):
             monitor="val_loss", mode="min", verbose=1, patience=3
         )
         mc_scheduler = keras.callbacks.ModelCheckpoint(
-            "best_single_channel_regression_model.h5", monitor="val_loss", mode="min"
+            model_save_name, monitor="val_loss", mode="min"
         )
 
         if validation_split > 0:
@@ -257,7 +288,7 @@ class SingleRegressionExperiment(BinaryClassificationExperiment):
 
         if load_trained_model:
             model = keras.models.load_model(
-                "best_single_channel_regression_model.h5", custom_objects={"rmse": rmse}
+                model_save_name, 
             )
         else:
             model = model_architecture(optimizer)
