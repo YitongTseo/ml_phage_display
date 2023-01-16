@@ -123,5 +123,21 @@ def BinaryClassificationRNN(optimizer):
     )
     return model
 
+def Joint_BinaryClassificationRNN_gelu(optimizer):
+    # create model
+    model = Sequential()
+    model.add(layers.Dense(16, activation="gelu"))
+    model.add(layers.Bidirectional(layers.LSTM(16)))
+    model.add(layers.Dense(16, activation="gelu"))
+    model.add(layers.Dense(8, activation="gelu"))
+    model.add(layers.Dense(4, activation="gelu"))
+    model.add(layers.Dense(2, activation="sigmoid"))
+    # Compile model
+    model.compile(
+        loss="binary_crossentropy",
+        optimizer=optimizer,
+        metrics=["accuracy", Recall(), Precision()],
+    )
+    return model
 
 
