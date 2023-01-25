@@ -11,6 +11,7 @@ from sklearn.model_selection import KFold
 from sklearn.metrics import confusion_matrix
 from sklearn.utils import shuffle
 from matplotlib import pyplot as plt
+from sklearn.model_selection import train_test_split
 
 def scatter_hist(x, y, ax, ax_histx, ax_histy, alpha=0.1):
     # no labels
@@ -59,6 +60,8 @@ def show_volcano(y, protein_of_interest, other_protein, title_addendum=""):
 
 
 def Kfold_sample(n_splits, stop_split, X, y): 
+    # TODO: I don't think this entirely correct since we need the same seed number
+    # for KFold if we want the same splits, unless it doesn't shuffle the splits which I think it might
     kf = KFold(n_splits=n_splits)
     i = 0
     for train_index, test_index in kf.split(X):
@@ -69,6 +72,18 @@ def Kfold_sample(n_splits, stop_split, X, y):
         if i==stop_split:
             break
         i += 1  
+    return X_train, X_test, y_f_train, y_f_test, y_p_train, y_p_test
+
+def train_test_split_sample(X, y): 
+    (X_train, X_test, y_train, y_test) = train_test_split(
+        X,
+        y,
+        test_size=0.2,
+        shuffle=True,
+        random_state=5,
+    )
+    y_f_train, y_f_test = y_train[:,1], y_test[:,1]
+    y_p_train, y_p_test = y_train[:,0], y_test[:,0]
     return X_train, X_test, y_f_train, y_f_test, y_p_train, y_p_test
 
 

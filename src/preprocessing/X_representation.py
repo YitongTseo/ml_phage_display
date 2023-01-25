@@ -13,10 +13,13 @@ from preprocessing.X_representation_utils import (
     initialize_physiochemical_properties,
     initialize_mol_descriptor_calculator,
     initialize_aa_to_smiles,
+    initialize_one_hot,
+    AA_ONE_HOT_ORDERING
 )
 from rdkit import Chem
 from rdkit.Chem import AllChem
 from rdkit.Chem import DataStructs
+import pdb
 
 MAX_PEPTIDE_LEN = 14
 # Initialize all per residue representations just once globally
@@ -26,6 +29,7 @@ DICT_AA_TO_RAA, DICT_RAA_TO_AA = initialize_RAAs()
 EXTENDED_PROP_AA = initialize_physiochemical_properties()
 AA_TO_SMILES = initialize_aa_to_smiles()
 MOL_DESCRIPTOR_CALCULTOR = initialize_mol_descriptor_calculator()
+ONEHOT_ENCODER = initialize_one_hot()
 
 
 def seq_to_pro2vec(seq):
@@ -48,6 +52,13 @@ def seq_to_prop(seq):
     vec = np.zeros((MAX_PEPTIDE_LEN, MAX_PEPTIDE_LEN))
     for idx, aa in enumerate(seq):
         vec[idx, :] = EXTENDED_PROP_AA[aa]
+    return vec
+
+
+def seq_to_onehot(seq):
+    vec = np.zeros((MAX_PEPTIDE_LEN, len(AA_ONE_HOT_ORDERING)))
+    for idx, aa in enumerate(seq):
+        vec[idx, :] = ONEHOT_ENCODER(aa)
     return vec
 
 

@@ -4,6 +4,7 @@ import sys
 HOME_DIRECTORY = pathlib.Path().absolute()
 sys.path.append(str(HOME_DIRECTORY) + "/src")
 
+import pdb
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
@@ -89,9 +90,8 @@ class Experiment:
 class BinaryClassificationExperiment(Experiment):
     epochs = 16 
 
-    def __init__(self, epochs=16) -> None:
+    def __init__(self) -> None:
         super().__init__()
-        self.epochs = epochs
 
     def train(
         self,
@@ -149,25 +149,8 @@ class BinaryClassificationExperiment(Experiment):
         return model
 
     def predict(self, model, X_test, y_true):
-        y_pred = model(X_test)
-        y_pred = y_pred.numpy().reshape(-1) >= 0.5
-        tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
-        pre = tp / (tp + fp)
-        rec = tp / (tp + fn)
-        acc = (tn + tp) / (tn + fp + fn + tp)
-        print(tn, fp, fn, tp)
-        print("accuracy", acc)
-        print("precision", pre)
-        print("recall", rec)
-        return (
-            y_pred,
-            {
-                "accuracy": acc,
-                "Precision": pre,
-                "Recall": rec,
-            },
-        )
-
+        # TODO(Yitong) We probably want to use evaluation.classifcation_evaluation here...
+        return [], {}
 
 class TwoChannelRegressionExperiment(Experiment):
     def predict(self, model, X_test, y_true):

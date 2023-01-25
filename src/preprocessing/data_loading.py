@@ -25,21 +25,29 @@ from preprocessing.X_representation import (
     seq_to_pro2vec,
     seq_to_RAA,
     seq_to_prop,
+    seq_to_onehot,
     MAX_PEPTIDE_LEN,
 )
 from itertools import compress
-from preprocessing.X_representation_utils import AA_PROPERTY_ORDERING
+from preprocessing.X_representation_utils import (
+    AA_PROPERTY_ORDERING,
+    AA_ONE_HOT_ORDERING,
+)
+from typing import List
 
-FEATURE_LIST = [
-    "Pro2Vec",
-    "RAA",
-] + AA_PROPERTY_ORDERING
+FEATURE_LIST = []
 
 
-class DATASET_TYPE(Enum):
-    BINARY_CLASSIFICATION = 1
-    LOG_FOLD_REGRESSION = 2
-    JOINT_REGRESSION = 3
+class AA_REPRESENTATION(Enum):
+    PRO2VEC = 1
+    RAA = 2
+    PHYSIOCHEM_PROPERTIES = 3
+    ONE_HOT = 3
+
+
+# class DATASET_TYPE(Enum):
+#     BINARY_CLASSIFICATION = 1
+#     REGRESSION = 2
 
 
 def read_data_and_preprocess(datafile="12ca5-MDM2-mCDH2-R3.csv"):
@@ -58,6 +66,7 @@ def read_data_and_preprocess(datafile="12ca5-MDM2-mCDH2-R3.csv"):
     lib["Pro2Vec"] = lib.Peptide.apply(seq_to_pro2vec)
     lib["RAA"] = lib.Peptide.apply(seq_to_RAA)
     lib["prop"] = lib.Peptide.apply(seq_to_prop)
+    lib["onehot"] = lib.Peptide.apply(seq_to_onehot)
     return lib
 
 
@@ -66,56 +75,77 @@ def build_dataset(
     protein_of_interest,
     other_protein,
     max_len=MAX_PEPTIDE_LEN,
-    dataset_type=DATASET_TYPE.BINARY_CLASSIFICATION,
+    aa_representations: List[AA_REPRESENTATION] = [
+        AA_REPRESENTATION.PRO2VEC,
+        AA_REPRESENTATION.RAA,
+        AA_REPRESENTATION.PHYSIOCHEM_PROPERTIES,
+        AA_REPRESENTATION.ONE_HOT,
+    ],
 ):
+    global FEATURE_LIST
     pro2vec = np.stack(lib["Pro2Vec"].to_numpy())
     raa = np.stack(lib["RAA"].to_numpy())
     prop = np.stack(lib["prop"].to_numpy())
+    onehot = np.stack(lib["onehot"].to_numpy())
     peptides = lib["Peptide"].to_list()
 
     # max length = 14, padding O
     pro2vec = pro2vec.reshape(-1, max_len, 1)
     raa = raa.reshape(-1, max_len, 1)
-    assert FEATURE_LIST.index("Pro2Vec") == 0 and FEATURE_LIST.index("RAA") == 1
-    # Concat Pro2Vec as the first element, RAA as the second element, and properties as elements 3-16
-    X = np.concatenate((pro2vec, raa, prop), axis=-1)
-    # TODO(Yitong): Do we want to normalize X?
 
-    if dataset_type == DATASET_TYPE.BINARY_CLASSIFICATION:
-        y = formulate_binary_classification_labels(lib, protein_of_interest)
-    elif dataset_type in (
-        # TODO(Yitong): We dont need both of these when they do the same thing...
-        DATASET_TYPE.LOG_FOLD_REGRESSION,
-        DATASET_TYPE.JOINT_REGRESSION,
-    ):
-        y = formulate_two_channel_regression_labels(
-            lib, protein_of_interest, other_protein
+    # By creating feature_list on the fly we can ensure it is the correct ordering
+    FEATURE_LIST = []
+    X = np.array([])
+    X.shape = (len(lib), max_len, 0)
+    if AA_REPRESENTATION.PRO2VEC in aa_representations:
+        X = np.concatenate((X, pro2vec), axis=-1)
+        FEATURE_LIST.append("Pro2Vec")
+    if AA_REPRESENTATION.RAA in aa_representations:
+        X = np.concatenate((X, raa), axis=-1)
+        FEATURE_LIST.append("RAA")
+    if AA_REPRESENTATION.PHYSIOCHEM_PROPERTIES in aa_representations:
+        X = np.concatenate((X, prop), axis=-1)
+        FEATURE_LIST += AA_PROPERTY_ORDERING
+    if AA_REPRESENTATION.ONE_HOT in aa_representations:
+        X = np.concatenate((X, onehot), axis=-1)
+        FEATURE_LIST += AA_ONE_HOT_ORDERING
+
+    y_raw = formulate_two_channel_regression_labels(
+        lib, protein_of_interest, other_protein
+    )
+    # Remove nans ... aka when p-value = 0
+    nans_mask = ~np.isnan(y_raw).any(axis=1)
+    # Remove negative infinity ... aka when p-value = 1
+    neg_inf_mask = ~(y_raw == -np.inf).any(axis=1)
+    mask = np.logical_and(nans_mask, neg_inf_mask)
+    X = X[mask]
+    peptides = list(compress(peptides, mask))
+    y_raw = y_raw[mask]
+
+    # log p-value into -log p-value
+    y_raw[:, 0] = -y_raw[:, 0]
+
+    # Normalize
+    scaler = StandardScaler()
+    scaler.fit(y_raw)
+    y_raw = scaler.transform(y_raw)
+    y_classes = np.copy(y_raw)
+
+    log_P_5percent, log_FC_zero = scaler.transform([[-np.log10(0.05), 0]])[0]
+    print(
+        " - log P value cutoff is {}, and log FC value cutoff is {}".format(
+            log_P_5percent, log_FC_zero
         )
-        # Remove nans ... aka when p-value = 0
-        nans_mask = ~np.isnan(y).any(axis=1)
-        # Remove negative infinity ... aka when p-value = 1
-        neg_inf_mask = ~(y == -np.inf).any(axis=1)
-        mask = np.logical_and(nans_mask, neg_inf_mask)
-        X = X[mask]
-        peptides = list(compress(peptides, mask))
-        y = y[mask]
+    )
 
-        # log p-value into -log p-value
-        y[:, 0] = -y[:, 0]
-
-        # Normalize
-        scaler = StandardScaler()
-        scaler.fit(y)
-        y = scaler.transform(y)
-        log_P_5percent, log_FC_zero = scaler.transform([[-np.log10(0.05), 0]])[0]
-        print(
-            " - log P value cutoff is {}, and log FC value cutoff is {}".format(
-                log_P_5percent, log_FC_zero
-            )
-        )
+    # Create y_classes based off of thresholds determined after scaling
+    y_classes[:, 1] = y_classes[:, 1] > log_FC_zero
+    y_classes[:, 0] = y_classes[:, 0] > log_P_5percent
 
     assert (
-        len(np.argwhere(np.isnan(y))) == 0
+        len(np.argwhere(np.isnan(y_raw))) == 0
     ), "we dont want any nans in our y-label dataset"
-    X, y, peptides = shuffle(X, y, peptides, random_state=0)
-    return X, y, peptides
+    X, y_classes, y_raw, peptides = shuffle(
+        X, y_classes, y_raw, peptides, random_state=0
+    )
+    return X, y_classes, y_raw, peptides

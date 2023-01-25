@@ -12,6 +12,7 @@ sys.path.append(os.path.join(HOME_DIRECTORY, "DELPHI/Feature_Computation"))
 import numpy as np
 import Pro2Vec_1D.compute as Pro2Vec
 from rdkit.ML.Descriptors.MoleculeDescriptors import MolecularDescriptorCalculator
+from sklearn.preprocessing import OneHotEncoder
 
 """
     Taken from table 5 in https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8232778/ 
@@ -37,7 +38,21 @@ AA_PROPERTY_ORDERING = [
     "T",
     "A2",
 ]
+# Includes 20 essential aa's & X for unknown aa
 AMINO_ACIDS = "ARNDCQEGHILKMFPSTWYVX"
+AA_ONE_HOT_ORDERING = [f"{aa}_one_hot" for aa in list(AMINO_ACIDS)]
+
+
+def initialize_one_hot():
+    aa_list = list(AMINO_ACIDS)
+    # Implemented my own naive onehotencoder since the sklearn one is surprisingly slow
+    def onehot_encoder(aa):
+        aa_idx = aa_list.index(aa)
+        encoding = np.zeros(len(aa_list))
+        encoding[aa_idx] = 1
+        return encoding
+
+    return onehot_encoder
 
 
 def initialize_physiochemical_properties():

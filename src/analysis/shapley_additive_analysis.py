@@ -28,6 +28,7 @@ class INVESTIGATION_TYPE(Enum):
 
 
 AA_FEATURE_DIM = len(FEATURE_LIST)
+print('whats our AA_FEATURE_DIM? ', FEATURE_LIST)
 
 
 def auto_cohorts(shap_values, max_cohorts):
@@ -85,6 +86,7 @@ def shapley_analysis(
     investigation_type=INVESTIGATION_TYPE.BY_FEATURE,
     num_background_samples=100,
     num_perturbation_samples=1000,
+    investigate_p_value=False,
 ):
     shap.initjs()
     investigate_X = np.array([x[0] for x in investigation_target])
@@ -97,7 +99,8 @@ def shapley_analysis(
         )
 
     def f(X_sample):
-        return model.predict(decode_X(X_sample))
+        index = 0 if investigate_p_value else 1
+        return model.predict(decode_X(X_sample))[:,index]
 
     def decode_X(X_sample):
         assert MAX_PEPTIDE_LEN == int(X_sample.shape[1] / AA_FEATURE_DIM)
@@ -123,15 +126,23 @@ def shapley_analysis(
     explainer = shap.KernelExplainer(f, summary)
     encoded_shap_values = explainer.shap_values(
         encoded_investigate_X, nsamples=num_perturbation_samples
-    )[0]
+    )
     shap_values = decode_X(encoded_shap_values)
 
     if len(encoded_investigate_X) == 1:
-        print("Expected value: ", explainer.expected_value)
+        print(
+            "Expected value: ",
+            explainer.expected_value,
+            "shapely value sum ",
+            shap_values.sum(),
+        )
         print("Model eval: ", model(investigate_X))
-        print("Does this match the sum of shapely values? ", shap_values.sum())
+        print(
+            "Does this match the sum of shapely values + expected value (\Sum(phi_i) + phi_0)? ",
+            shap_values.sum() + explainer.expected_value,
+        )
         if investigation_type == INVESTIGATION_TYPE.BY_FEATURE:
-            print('Yitong: The expected value here might not really make sense?')
+            print("Yitong: The expected value here might not really make sense?")
             shap.force_plot(
                 explainer.expected_value,
                 shap_values.sum(axis=1)[0],
@@ -189,7 +200,7 @@ def shapley_analysis(
             feature_names=feature_names,
             instance_names=investigate_peptides,
         )
-        shap.summary_plot(explanation, features)
+        shap.summary_plot(explanation, features, cmap="plasma")
 
         # Let's do some cohorting!
         def cohort_analysis(max_cohorts):
@@ -205,4 +216,4 @@ def shapley_analysis(
         cohort_analysis(5)
         cohort_analysis(6)
         pdb.set_trace()
-        print('what now bub?')
+        print("what now bub?")
