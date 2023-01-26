@@ -88,7 +88,7 @@ class Experiment:
 
 
 class BinaryClassificationExperiment(Experiment):
-    epochs = 16 
+    epochs = 50 
 
     def __init__(self) -> None:
         super().__init__()
@@ -112,10 +112,10 @@ class BinaryClassificationExperiment(Experiment):
 
         lr_scheduler = keras.callbacks.LearningRateScheduler(scheduler)
         es_scheduler = keras.callbacks.EarlyStopping(
-            monitor="val_loss", mode="min", verbose=1, patience=3
+            monitor="val_loss", mode="min", verbose=1, patience=10^4
         )
         mc_scheduler = keras.callbacks.ModelCheckpoint(
-            "best_binary_classification_model.h5", monitor="val_loss", mode="min"
+            model_save_name, monitor="val_loss", mode="min"
         )
 
         if validation_split > 0:
@@ -130,7 +130,7 @@ class BinaryClassificationExperiment(Experiment):
             (X_val, y_val) = (np.array([]), np.array([]))
 
         if load_trained_model:
-            model = keras.models.load_model("best_binary_classification_model.h5")
+            model = keras.models.load_model(model_save_name)
         else:
             model = model_architecture(optimizer)
             model.fit(

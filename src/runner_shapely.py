@@ -100,8 +100,8 @@ from tensorflow import keras
 """
 
 R3_lib = read_data_and_preprocess(datafile="12ca5-MDM2-mCDH2-R3.csv")
-protein_of_interest = "12ca5"#"MDM2" 
-other_protein = "MDM2"
+protein_of_interest = "MDM2"#"MDM2" 
+other_protein = "12ca5"
 X, y, y_raw, peptides = data_loading.build_dataset(
     R3_lib,
     protein_of_interest=protein_of_interest,
@@ -153,60 +153,68 @@ learned_targets = [
     for idx in np.where(np.logical_and(y_pred[:,0], y_pred[:,1]))[0]
 ]
 print('these are what the model predicts as true ', [p[1] for p in learned_targets])
-print('is AQCLWSWCV a true sample? ', y[[idx for idx, x in enumerate(peptides) if x == "AQCLWSWCV"][0]])
-shapley_analysis(
-    model,
-    X,
-    [x for x in all_targets if x[1] == "AQCLWSWCV"], 
-    investigation_type=INVESTIGATION_TYPE.BY_AMINO_ACID,
-    num_background_samples=200,
-    num_perturbation_samples=2000,
-)
-print('is ACWGWECIS a true sample? ', y[[idx for idx, x in enumerate(peptides) if x == "ACWGWECIS"][0]])
-shapley_analysis(
-    model,
-    X,
-    [x for x in all_targets if x[1] == "ACWGWECIS"], # Known binder
-    investigation_type=INVESTIGATION_TYPE.BY_AMINO_ACID,
-    num_background_samples=200,
-    num_perturbation_samples=2000,
-)
-print('is AFCVWRWCS a true sample? ', y[[idx for idx, x in enumerate(peptides) if x == "AFCVWRWCS"][0]])
-shapley_analysis(
-    model,
-    X,
-    [x for x in all_targets if x[1] == "AFCVWRWCS"], 
-    investigation_type=INVESTIGATION_TYPE.BY_AMINO_ACID,
-    num_background_samples=200,
-    num_perturbation_samples=2000,
-)
-shapley_analysis(
-    model,
-    X,
-    [x for x in all_targets if x[1] == "ALCQGDFNC"], # Known non-binder
-    investigation_type=INVESTIGATION_TYPE.BY_AMINO_ACID,
-    num_background_samples=200,
-    num_perturbation_samples=2000,
-)
-shapley_analysis(
-    model,
-    X,
-    [x for x in all_targets if x[1] == "AACWKHVCS"], # Known non-binder
-    investigation_type=INVESTIGATION_TYPE.BY_AMINO_ACID,
-    num_background_samples=200,
-    num_perturbation_samples=2000,
-)
 
-shapley_analysis(
-    model,
-    X,
-    [x for x in all_targets if x[1] == "ACVDYAACR"], # Known non-binder
-    investigation_type=INVESTIGATION_TYPE.BY_AMINO_ACID,
-    num_background_samples=200,
-    num_perturbation_samples=2000,
-)
+# print('is ACWGWECIS a true sample? ', y[[idx for idx, x in enumerate(peptides) if x == "ACWGWECIS"][0]])
+# shapley_analysis(
+#     model,
+#     X,
+#     [x for x in all_targets if x[1] == "ACWGWECIS"], # Known binder
+#     investigation_type=INVESTIGATION_TYPE.BY_AMINO_ACID,
+#     num_background_samples=200,
+#     num_perturbation_samples=2000,
+# )
+# print('is AFCVWRWCS a true sample? ', y[[idx for idx, x in enumerate(peptides) if x == "AFCVWRWCS"][0]])
+# shapley_analysis(
+#     model,
+#     X,
+#     [x for x in all_targets if x[1] == "AFCVWRWCS"], 
+#     investigation_type=INVESTIGATION_TYPE.BY_AMINO_ACID,
+#     num_background_samples=200,
+#     num_perturbation_samples=2000,
+# )
+# shapley_analysis(
+#     model,
+#     X,
+#     [x for x in all_targets if x[1] == "ALCQGDFNC"], # Known non-binder
+#     investigation_type=INVESTIGATION_TYPE.BY_AMINO_ACID,
+#     num_background_samples=200,
+#     num_perturbation_samples=2000,
+# )
+# shapley_analysis(
+#     model,
+#     X,
+#     [x for x in all_targets if x[1] == "AACWKHVCS"], # Known non-binder
+#     investigation_type=INVESTIGATION_TYPE.BY_AMINO_ACID,
+#     num_background_samples=200,
+#     num_perturbation_samples=2000,
+# )
 
-pdb.set_trace()
+# shapley_analysis(
+#     model,
+#     X,
+#     [x for x in all_targets if x[1] == "ACVDYAACR"], # Known non-binder
+#     investigation_type=INVESTIGATION_TYPE.BY_AMINO_ACID,
+#     num_background_samples=200,
+#     num_perturbation_samples=2000,
+# )
+
+# shapley_analysis(
+#     model,
+#     X,
+#     [x for x in all_targets if x[1] == "AICRGDYAC"], # Known 12ca5 binder
+#     investigation_type=INVESTIGATION_TYPE.BY_AMINO_ACID,
+#     num_background_samples=200,
+#     num_perturbation_samples=2000,
+# )
+# shapley_analysis(
+#     model,
+#     X,
+#     [x for x in all_targets if x[1] == "DYPDYAE"], # Known 12ca5 binder
+#     investigation_type=INVESTIGATION_TYPE.BY_AMINO_ACID,
+#     num_background_samples=200,
+#     num_perturbation_samples=2000,
+# )
+
 # Let's do an investigation of the first 300 proteins
 investigation_target = all_targets[:100]
 shapley_analysis(

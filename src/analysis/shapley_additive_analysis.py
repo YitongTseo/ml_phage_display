@@ -28,8 +28,6 @@ class INVESTIGATION_TYPE(Enum):
 
 
 AA_FEATURE_DIM = len(FEATURE_LIST)
-print('whats our AA_FEATURE_DIM? ', FEATURE_LIST)
-
 
 def auto_cohorts(shap_values, max_cohorts):
     """
@@ -86,7 +84,8 @@ def shapley_analysis(
     investigation_type=INVESTIGATION_TYPE.BY_FEATURE,
     num_background_samples=100,
     num_perturbation_samples=1000,
-    investigate_p_value=False,
+    aa_feature_dim=AA_FEATURE_DIM,
+    peptide_dim=MAX_PEPTIDE_LEN,
 ):
     shap.initjs()
     investigate_X = np.array([x[0] for x in investigation_target])
@@ -99,17 +98,18 @@ def shapley_analysis(
         )
 
     def f(X_sample):
-        index = 0 if investigate_p_value else 1
-        return model.predict(decode_X(X_sample))[:,index]
+        pred = model.predict(decode_X(X_sample))
+        # Multiply predicted FC confidence & predicted P-Value confidence
+        return pred[:,0] * pred[:, 1]
 
     def decode_X(X_sample):
-        assert MAX_PEPTIDE_LEN == int(X_sample.shape[1] / AA_FEATURE_DIM)
-        return X_sample.reshape(X_sample.shape[0], MAX_PEPTIDE_LEN, AA_FEATURE_DIM)
+        assert peptide_dim == int(X_sample.shape[1] / aa_feature_dim)
+        return X_sample.reshape(X_sample.shape[0], peptide_dim, aa_feature_dim)
 
     def encode_X(X_sample):
-        assert X_sample.shape[1] == MAX_PEPTIDE_LEN
-        assert X_sample.shape[2] == AA_FEATURE_DIM
-        return X_sample.reshape(X_sample.shape[0], MAX_PEPTIDE_LEN * AA_FEATURE_DIM)
+        assert X_sample.shape[1] == peptide_dim
+        assert X_sample.shape[2] == aa_feature_dim
+        return X_sample.reshape(X_sample.shape[0], peptide_dim * aa_feature_dim)
 
     encoded_X = encode_X(X)
     encoded_investigate_X = encode_X(investigate_X)
@@ -125,7 +125,7 @@ def shapley_analysis(
     # Note that this requires (num_background_samples * num_perturbation_samples) evaluations of the model.
     explainer = shap.KernelExplainer(f, summary)
     encoded_shap_values = explainer.shap_values(
-        encoded_investigate_X, nsamples=num_perturbation_samples
+        encoded_investigate_X, nsamples=num_perturbation_samples, silent= True
     )
     shap_values = decode_X(encoded_shap_values)
 
@@ -136,7 +136,8 @@ def shapley_analysis(
             "shapely value sum ",
             shap_values.sum(),
         )
-        print("Model eval: ", model(investigate_X))
+        pred = model(investigate_X)
+        print("Model eval: ", pred[:,0] * pred[:, 1])
         print(
             "Does this match the sum of shapely values + expected value (\Sum(phi_i) + phi_0)? ",
             shap_values.sum() + explainer.expected_value,
@@ -166,30 +167,30 @@ def shapley_analysis(
             plt.title(
                 "Attribution by amino acid for "
                 + investigate_peptides[0]
-                + " \n(negative values decrease log fold, positive values increase log fold)"
+                + " \n(negative value tend toward 12ca5 binders, positive values tend toward MDM2 binders)"
             )
             plt.xticks(np.asarray([i for i in range(len(peptide_aas))]), peptide_aas)
             plt.show()
     else:
         if investigation_type == INVESTIGATION_TYPE.BY_FEATURE:
-            max_display = AA_FEATURE_DIM
+            max_display = aa_feature_dim
             shap_values = shap_values.sum(axis=1)
             features = investigate_X.mean(axis=1)
             feature_names = FEATURE_LIST
         elif investigation_type == INVESTIGATION_TYPE.BY_AMINO_ACID:
-            max_display = MAX_PEPTIDE_LEN
+            max_display = peptide_dim
             shap_values = shap_values.sum(axis=2)
             features = investigate_X.mean(axis=2)
-            feature_names = ["aa_" + str(idx) for idx in range(MAX_PEPTIDE_LEN)]
+            feature_names = ["aa_" + str(idx) for idx in range(peptide_dim)]
         elif investigation_type == INVESTIGATION_TYPE.BY_AMINO_ACID_AND_FEATURE:
-            max_display = AA_FEATURE_DIM * MAX_PEPTIDE_LEN
+            max_display = aa_feature_dim * peptide_dim
             shap_values = encoded_shap_values
             features = encoded_investigate_X
             feature_names = [
                 tup[0] + ":" + tup[1]
                 for tup in list(
                     product(
-                        ["aa_" + str(idx) for idx in range(MAX_PEPTIDE_LEN)],
+                        ["aa_" + str(idx) for idx in range(peptide_dim)],
                         FEATURE_LIST,
                     )
                 )
@@ -215,5 +216,3 @@ def shapley_analysis(
         cohort_analysis(4)
         cohort_analysis(5)
         cohort_analysis(6)
-        pdb.set_trace()
-        print("what now bub?")

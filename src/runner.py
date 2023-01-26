@@ -23,7 +23,7 @@ import pdb
 from sklearn.model_selection import train_test_split
 from analysis.model_run_comparisons import model_comparison_matrix_visualization
 
-model_comparison_matrix_visualization()
+# model_comparison_matrix_visualization()
 
 
 R3_lib = data_loading.read_data_and_preprocess(datafile="12ca5-MDM2-mCDH2-R3.csv")

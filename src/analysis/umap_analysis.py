@@ -16,7 +16,7 @@ import umap
 
 
 def embedding_classification(model, X_train):
-    nn_emb = model.layers[2](model.layers[1](model.layers[0](X_train)))
+    nn_emb = model.layers[3](model.layers[2](model.layers[1](model.layers[0](X_train))))
     reducer = umap.UMAP(n_neighbors=10, min_dist=0.1, n_components=2)
     reduced_emb = reducer.fit_transform(nn_emb)
     return reduced_emb
@@ -60,6 +60,12 @@ def embedding_regression(model, X_train):
 def UMAP_log_Fold(embedding, y_train):
     ax = sns.scatterplot(x=embedding[:, 0], y=embedding[:, 1], hue=y_train, alpha=0.1)
     plt.title("RNN embedding UMAP, label with log FC value")
+
+
+# tests label with FC value
+def UMAP_vis(embedding, y_train, title):
+    ax = sns.scatterplot(x=embedding[:, 0], y=embedding[:, 1], hue=y_train, alpha=0.1)
+    plt.title(title)
 
 
 # label with binary log FC value

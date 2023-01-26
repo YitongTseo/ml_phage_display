@@ -148,4 +148,4 @@ def build_dataset(
     X, y_classes, y_raw, peptides = shuffle(
         X, y_classes, y_raw, peptides, random_state=0
     )
-    return X, y_classes, y_raw, peptides
+    return X, y_classes, y_raw, peptides, FEATURE_LIST
