@@ -16,8 +16,9 @@ import umap
 
 
 def embedding_classification(model, X_train):
+    # nn_emb = model.layers[2](model.layers[1](model.layers[0](X_train)))
     nn_emb = model.layers[3](model.layers[2](model.layers[1](model.layers[0](X_train))))
-    reducer = umap.UMAP(n_neighbors=10, min_dist=0.1, n_components=2)
+    reducer = umap.UMAP(n_neighbors=10, min_dist=0.3, n_components=2)
     reduced_emb = reducer.fit_transform(nn_emb)
     return reduced_emb
 
@@ -63,10 +64,72 @@ def UMAP_log_Fold(embedding, y_train):
 
 
 # tests label with FC value
-def UMAP_vis(embedding, y_train, title):
+def UMAP_vis(embedding, y_train, title, rectangle=None):
     ax = sns.scatterplot(x=embedding[:, 0], y=embedding[:, 1], hue=y_train, alpha=0.1)
+    if rectangle:
+        ax.add_patch(rectangle)
     plt.title(title)
 
+def UMAP_dual_vis(embedding, mdm2_y_raw, kde=False):
+    mdm2_ranking = mdm2_y_raw[:, 1] * mdm2_y_raw[:, 0] > 0.1
+    print('The size we are going with for MDM2 hotspot', mdm2_ranking.sum())
+
+    ca5_ranking = - mdm2_y_raw[:, 1] * mdm2_y_raw[:, 0] > 3
+    print('The size we are going with for 12ca5 hotspot', ca5_ranking.sum())
+
+    neither_mdm2_nor_12ca5_ranking = (False == np.logical_or(ca5_ranking, mdm2_ranking))
+    assert (mdm2_ranking.sum() + ca5_ranking.sum() + neither_mdm2_nor_12ca5_ranking.sum()) == len(mdm2_y_raw)
+
+    fig, ax = plt.subplots()
+    if kde:
+        sns.kdeplot(
+            x=embedding[mdm2_ranking][:, 0],
+            y=embedding[mdm2_ranking][:, 1],
+            color='blue',
+            label="MDM2 hotspot",
+            ax=ax
+        )
+        sns.kdeplot(
+            x=embedding[ca5_ranking][:, 0],
+            y=embedding[ca5_ranking][:, 1],
+            color='red',
+            label="12ca5 hotspot",
+            ax=ax
+        )
+        sns.kdeplot(
+            x=embedding[neither_mdm2_nor_12ca5_ranking][:, 0],
+            y=embedding[neither_mdm2_nor_12ca5_ranking][:, 1],
+            color='grey',
+            label="Neither hot spot",
+            ax=ax
+        )
+    else:
+        sns.scatterplot(
+            x=embedding[mdm2_ranking][:, 0],
+            y=embedding[mdm2_ranking][:, 1],
+            color='blue',
+            alpha=0.1,
+            label="MDM2 hotspot",
+            ax=ax
+        )
+        sns.scatterplot(
+            x=embedding[ca5_ranking][:, 0],
+            y=embedding[ca5_ranking][:, 1],
+            color='red',
+            alpha=0.1,
+            label="12ca5 hotspot",
+            ax=ax
+        )
+        sns.scatterplot(
+            x=embedding[neither_mdm2_nor_12ca5_ranking][:, 0],
+            y=embedding[neither_mdm2_nor_12ca5_ranking][:, 1],
+            color='lightgrey',
+            label="Neither hot spot",
+            alpha=0.05,
+            ax=ax
+        )
+    plt.title("RNN embedding UMAP with 12ca5 & MDM2 hotspots highlighted")
+    plt.show()
 
 # label with binary log FC value
 def UMAP_binary_log_Fold(embedding, y_train, cutoff):

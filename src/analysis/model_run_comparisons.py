@@ -125,7 +125,7 @@ def model_comparison_matrix_visualization(
 
     for representation_params in tqdm.tqdm(representations):
         for model_params in tqdm.tqdm(models):
-            X, y, y_raw, peptides = data_loading.build_dataset(
+            X, y, _, _, _, _, _, = data_loading.build_dataset(
                 R3_lib,
                 protein_of_interest=protein_of_interest,
                 other_protein=other_protein,

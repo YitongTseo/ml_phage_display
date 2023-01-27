@@ -45,11 +45,6 @@ class AA_REPRESENTATION(Enum):
     ONE_HOT = 3
 
 
-# class DATASET_TYPE(Enum):
-#     BINARY_CLASSIFICATION = 1
-#     REGRESSION = 2
-
-
 def read_data_and_preprocess(datafile="12ca5-MDM2-mCDH2-R3.csv"):
     lib = pd.read_csv(os.path.join(HOME_DIRECTORY, "data", datafile))
 
@@ -148,4 +143,13 @@ def build_dataset(
     X, y_classes, y_raw, peptides = shuffle(
         X, y_classes, y_raw, peptides, random_state=0
     )
-    return X, y_classes, y_raw, peptides, FEATURE_LIST
+
+    # create Other peptide data by reversing Fold change values
+    # this is acceptable because the class threshold (log_FC_zero)
+    # is set to 0, hence classes are symmetric
+    other_y_classes = np.copy(y_classes)
+    other_y_classes[:, 1] = other_y_classes[:, 1] == 0
+
+    other_y_raw = np.copy(y_raw)
+    other_y_raw[:, 1] = -other_y_raw[:, 1]
+    return X, y_classes, y_raw, other_y_classes, other_y_raw, peptides, FEATURE_LIST

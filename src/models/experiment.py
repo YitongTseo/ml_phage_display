@@ -16,6 +16,7 @@ from sklearn.model_selection import train_test_split
 from models.rnn import two_channel_mse, p_value_rmse, fold_rmse
 from tensorflow.keras.metrics import mean_squared_error
 
+
 @dataclass
 class Result:
     metrics: dict[str, Any] = None
@@ -33,7 +34,7 @@ class Experiment:
         test_train_split=0.2,
         load_trained_model=False,
         model_save_name=None,
-        optimizer=keras.optimizers.Adam(learning_rate=0.001)
+        optimizer=keras.optimizers.Adam(learning_rate=0.001),
     ):
         (X_train, X_test, y_train, y_test) = train_test_split(
             X,
@@ -88,7 +89,7 @@ class Experiment:
 
 
 class BinaryClassificationExperiment(Experiment):
-    epochs = 50 
+    epochs = 50
 
     def __init__(self) -> None:
         super().__init__()
@@ -102,7 +103,7 @@ class BinaryClassificationExperiment(Experiment):
         load_trained_model=False,
         validation_split=0.1,
         # TODO: yitong do something with model_save_name but dont let experiment over write it...
-        model_save_name=None
+        model_save_name=None,
     ):
         def scheduler(epoch, lr):
             if epoch < 5:
@@ -112,11 +113,14 @@ class BinaryClassificationExperiment(Experiment):
 
         lr_scheduler = keras.callbacks.LearningRateScheduler(scheduler)
         es_scheduler = keras.callbacks.EarlyStopping(
-            monitor="val_loss", mode="min", verbose=1, patience=10^4
+            monitor="val_loss", mode="min", verbose=1, patience=10 ^ 4
         )
-        mc_scheduler = keras.callbacks.ModelCheckpoint(
-            model_save_name, monitor="val_loss", mode="min"
-        )
+        if model_save_name is not None:
+            mc_scheduler = keras.callbacks.ModelCheckpoint(
+                model_save_name, monitor="val_loss", mode="min"
+            )
+        else: 
+            mc_scheduler= None
 
         if validation_split > 0:
             (X_train, X_val, y_train, y_val) = train_test_split(
@@ -129,7 +133,7 @@ class BinaryClassificationExperiment(Experiment):
         else:
             (X_val, y_val) = (np.array([]), np.array([]))
 
-        if load_trained_model:
+        if load_trained_model and model_save_name is not None:
             model = keras.models.load_model(model_save_name)
         else:
             model = model_architecture(optimizer)
@@ -144,148 +148,11 @@ class BinaryClassificationExperiment(Experiment):
                 # class_weight={1: 0.5, 0: 0.5},
                 validation_freq=1,
                 use_multiprocessing=False,
-                callbacks=[lr_scheduler, es_scheduler, mc_scheduler],
+                callbacks=[lr_scheduler, es_scheduler]
+                + ([mc_scheduler] if mc_scheduler is not None else []),
             )
         return model
 
     def predict(self, model, X_test, y_true):
         # TODO(Yitong) We probably want to use evaluation.classifcation_evaluation here...
         return [], {}
-
-class TwoChannelRegressionExperiment(Experiment):
-    def predict(self, model, X_test, y_true):
-        y_pred = model(X_test)
-        return (
-            y_pred,
-            {
-                "mse": np.mean(two_channel_mse(y_true, y_pred)),
-            },
-        )
-
-    def train(
-        self,
-        X_train,
-        y_train,
-        model_architecture,
-        optimizer=keras.optimizers.Adam(learning_rate=0.001),
-        load_trained_model=False,
-        validation_split=0.1,
-        model_save_name=None
-    ):
-        def scheduler(epoch, lr):
-            if epoch < 5:
-                return lr
-            else:
-                return lr * tf.math.exp(-0.1)
-
-        lr_scheduler = keras.callbacks.LearningRateScheduler(scheduler)
-        es_scheduler = keras.callbacks.EarlyStopping(
-            monitor="val_loss", mode="min", verbose=1, patience=3
-        )
-        mc_scheduler = keras.callbacks.ModelCheckpoint(
-            "best_two_channel_regression_model.h5", monitor="val_loss", mode="min"
-        )
-
-        if validation_split > 0:
-            (X_train, X_val, y_train, y_val) = train_test_split(
-                X_train,
-                y_train,
-                test_size=validation_split,
-                shuffle=True,
-                random_state=5,
-            )
-        else:
-            (X_val, y_val) = (np.array([]), np.array([]))
-
-        if load_trained_model:
-            model = keras.models.load_model(
-                "best_two_channel_regression_model.h5",
-                custom_objects={
-                    "two_channel_mse": two_channel_mse,
-                    "fold_rmse": fold_rmse,
-                    "p_value_rmse": p_value_rmse,
-                },
-            )
-        else:
-            model = model_architecture(optimizer)
-            model.fit(
-                x=X_train,
-                y=y_train,
-                validation_data=(X_val, y_val),
-                batch_size=128,
-                epochs=16,
-                verbose="auto",
-                initial_epoch=0,
-                validation_freq=1,
-                use_multiprocessing=False,
-                callbacks=[lr_scheduler, es_scheduler, mc_scheduler],
-            )
-
-        return model
-
-
-class SingleChannelRegressionExperiment(Experiment):
-    def predict(self, model, X_test, y_true):
-        y_pred = model(X_test)
-        return (
-            y_pred,
-            {
-                "mse": mean_squared_error(y_true, y_pred),
-            },
-        )
-
-    def train(
-        self,
-        X_train,
-        y_train,
-        model_architecture,
-        optimizer=keras.optimizers.Adam(learning_rate=0.001),
-        load_trained_model=False,
-        validation_split=0.1,
-        model_save_name="best_fc_single_channel_regression_model.h5",
-    ):
-        def scheduler(epoch, lr):
-            if epoch < 5:
-                return lr
-            else:
-                return lr * tf.math.exp(-0.1)
-
-        lr_scheduler = keras.callbacks.LearningRateScheduler(scheduler)
-        es_scheduler = keras.callbacks.EarlyStopping(
-            monitor="val_loss", mode="min", verbose=1, patience=3
-        )
-        mc_scheduler = keras.callbacks.ModelCheckpoint(
-            model_save_name, monitor="val_loss", mode="min"
-        )
-
-        if validation_split > 0:
-            (X_train, X_val, y_train, y_val) = train_test_split(
-                X_train,
-                y_train,
-                test_size=validation_split,
-                shuffle=True,
-                random_state=5,
-            )
-        else:
-            (X_val, y_val) = (np.array([]), np.array([]))
-
-        if load_trained_model:
-            model = keras.models.load_model(
-                model_save_name, 
-            )
-        else:
-            model = model_architecture(optimizer)
-            model.fit(
-                x=X_train,
-                y=y_train,
-                validation_data=(X_val, y_val),
-                batch_size=128,
-                epochs=16,
-                verbose="auto",
-                initial_epoch=0,
-                validation_freq=1,
-                use_multiprocessing=False,
-                callbacks=[lr_scheduler, es_scheduler, mc_scheduler],
-            )
-
-        return model

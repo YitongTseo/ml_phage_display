@@ -16,7 +16,16 @@ def find_12ca5_motif(seq):
 
 def seq_contains_12ca5_motif(seq):
     return find_12ca5_motif(seq) is not None
-
+    
+def sort_peptides_by_model_ranking(peptides_test, y_pred_raw):
+    return [
+        peptide
+        for peptide, _ in sorted(
+            zip(peptides_test, y_pred_raw[:, 1] * y_pred_raw[:, 0]),
+            key=lambda pair: pair[1],
+            reverse=True,
+        )
+    ]
 
 # TODO(Yitong & Yehlin): we might want to do something a little more sophisticated here
 # Where we only take the peptides which are in the partition of the UMAP we care about...
@@ -26,16 +35,6 @@ def seq_contains_12ca5_motif(seq):
 def plot_ratio_by_ranking(
     peptides_test, mdm2_y_pred_raw, ca5_y_pred_raw, title, step_size=100, plot_theoretical_maximums=True
 ):
-    def sort_peptides_by_model_ranking(peptides_test, y_pred_raw):
-        return [
-            peptide
-            for peptide, _ in sorted(
-                zip(peptides_test, y_pred_raw[:, 1] * y_pred_raw[:, 0]),
-                key=lambda pair: pair[1],
-                reverse=True,
-            )
-        ]
-
     def compute_hit_ratios(
         sorted_peptides, hit_detection_function, step_size=step_size
     ):

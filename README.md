@@ -10,8 +10,6 @@ To run:
 
 
 TODOs:
-* Generate possible peptides
-* Expand to other data
-* Incorporate p-value score 
-* Test generative models
-* TODO: remember to fix that weird change in feature_computation in the DELPHI package: `DELPHI/Feature_Computation/Pro2Vec_1D/compute.py:25`
+* (Yehlin?) Add the volcano plots with markers of our predicted peptides into F1 notebook
+* (Yitong) Generate list of 100 peptides which we most strongly predict for 12ca5 & MDM2 to F3
+* Benchmark CNN alongside the Random Forest & BiLSTM in the model_analysis (Add it to F0 misc)
