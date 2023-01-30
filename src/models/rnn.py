@@ -141,12 +141,11 @@ def Joint_BinaryClassificationRNN_gelu(optimizer):
     return model
 
 
-def Joint_BinaryClassification_CNNRNN(optimizer):
+def Joint_BinaryClassificationCNN_gelu(optimizer):
     # create model
     model = Sequential()
     model.add(layers.Conv1D(16, 3, activation='relu',  input_shape=(14,16)))
     model.add(layers.MaxPooling1D(pool_size=2))
-    model.add(layers.Bidirectional(layers.LSTM(16)))
     model.add(layers.Dense(16, activation="gelu"))
     model.add(layers.Dense(8, activation="gelu"))
     model.add(layers.Dense(4, activation="gelu"))
