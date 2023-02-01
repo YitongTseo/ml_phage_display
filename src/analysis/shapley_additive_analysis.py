@@ -86,6 +86,7 @@ def shapley_analysis(
     num_perturbation_samples=1000,
     aa_feature_dim=AA_FEATURE_DIM,
     peptide_dim=MAX_PEPTIDE_LEN,
+    show_plot=True,
 ):
     shap.initjs()
     investigate_X = np.array([x[0] for x in investigation_target])
@@ -143,34 +144,37 @@ def shapley_analysis(
             shap_values.sum() + explainer.expected_value,
         )
         if investigation_type == INVESTIGATION_TYPE.BY_FEATURE:
-            print("Yitong: The expected value here might not really make sense?")
-            shap.force_plot(
-                explainer.expected_value,
-                shap_values.sum(axis=1)[0],
-                features=investigate_X.mean(axis=1)[0],
-                feature_names=FEATURE_LIST,
-                matplotlib=True,
-                show=True,
-            )
+            attribution = shap_values.sum(axis=1)[0]
+            if show_plot:
+                shap.force_plot(
+                    explainer.expected_value,
+                    attribution,
+                    features=investigate_X.mean(axis=1)[0],
+                    feature_names=FEATURE_LIST,
+                    matplotlib=True,
+                    show=True,
+                )
         elif investigation_type == INVESTIGATION_TYPE.BY_AMINO_ACID:
             peptide_aas = list(investigate_peptides[0])
             # Only show attribution over the peptide length
             attribution = shap_values.sum(axis=2)[0][: len(peptide_aas)]
-            plt.bar(
-                range(len(peptide_aas)),
-                attribution,
-                color="maroon",
-                width=0.4,
-            )
-            plt.xlabel("Amino Acid")
-            plt.ylabel("Shap Value")
-            plt.title(
-                "Attribution by amino acid for "
-                + investigate_peptides[0]
-                + " \n(negative value tend toward 12ca5 binders, positive values tend toward MDM2 binders)"
-            )
-            plt.xticks(np.asarray([i for i in range(len(peptide_aas))]), peptide_aas)
-            plt.show()
+            if show_plot:
+                plt.bar(
+                    range(len(peptide_aas)),
+                    attribution,
+                    color="maroon",
+                    width=0.4,
+                )
+                plt.xlabel("Amino Acid")
+                plt.ylabel("Shap Value")
+                plt.title(
+                    "Attribution by amino acid for "
+                    + investigate_peptides[0]
+                    + " \n(negative value tend toward 12ca5 binders, positive values tend toward MDM2 binders)"
+                )
+                plt.xticks(np.asarray([i for i in range(len(peptide_aas))]), peptide_aas)
+                plt.show()
+        return attribution
     else:
         if investigation_type == INVESTIGATION_TYPE.BY_FEATURE:
             max_display = aa_feature_dim
