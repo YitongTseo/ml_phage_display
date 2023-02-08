@@ -4,6 +4,7 @@ import sys
 HOME_DIRECTORY = pathlib.Path().absolute()
 sys.path.append(str(HOME_DIRECTORY) + "/src")
 
+import os
 import pdb
 import numpy as np
 import tensorflow as tf
@@ -29,34 +30,57 @@ class Experiment:
     def run_adhoc_experiment(
         self,
         X,
-        y,
+        target_y,
+        other_y,
+        peptides,
         model_architecture,
         test_train_split=0.2,
         load_trained_model=False,
         model_save_name=None,
         optimizer=keras.optimizers.Adam(learning_rate=0.001),
     ):
-        (X_train, X_test, y_train, y_test) = train_test_split(
+        (
+            X_train,
+            X_test,
+            target_y_train,
+            target_y_test,
+            other_y_train,
+            other_y_test,
+            peptides_train,
+            peptides_test,
+        ) = train_test_split(
             X,
-            y,
+            target_y,
+            other_y,
+            peptides,
             test_size=test_train_split,
             shuffle=True,
             random_state=5,
         )
         model = self.train(
             X_train,
-            y_train,
+            target_y_train,
             model_architecture,
             load_trained_model=load_trained_model,
             model_save_name=model_save_name,
             optimizer=optimizer,
         )
-        y_pred, metrics = self.predict(model, X_test, y_test)
-        return Result(
-            trained_model=model,
-            metrics=metrics,
-            y_pred=y_pred,
-            y_true=y_test,
+        y_pred, metrics = self.predict(model, X_test, target_y_test)
+        return (
+            X_train,
+            X_test,
+            target_y_train,
+            target_y_test,
+            other_y_train,
+            other_y_test,
+            peptides_train,
+            peptides_test,
+            Result(
+                trained_model=model,
+                metrics=metrics,
+                y_pred=y_pred,
+                y_true=target_y_test,
+            ),
         )
 
     def run_cross_validation_experiment(self, X, y, model_architecture, n_splits=5):
@@ -119,8 +143,8 @@ class BinaryClassificationExperiment(Experiment):
             mc_scheduler = keras.callbacks.ModelCheckpoint(
                 model_save_name, monitor="val_loss", mode="min"
             )
-        else: 
-            mc_scheduler= None
+        else:
+            mc_scheduler = None
 
         if validation_split > 0:
             (X_train, X_val, y_train, y_val) = train_test_split(
@@ -134,7 +158,12 @@ class BinaryClassificationExperiment(Experiment):
             (X_val, y_val) = (np.array([]), np.array([]))
 
         if load_trained_model and model_save_name is not None:
+            assert ".h5" in model_save_name or os.path.isdir(
+                model_save_name
+            ), " either needs to be a .h5 filename or a directory to a .pb file"
             model = keras.models.load_model(model_save_name)
+            # else:
+            #     model = tf.saved_model.load(model_save_name)
         else:
             model = model_architecture(optimizer)
             model.fit(

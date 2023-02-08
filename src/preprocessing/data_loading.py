@@ -42,7 +42,7 @@ class AA_REPRESENTATION(Enum):
     PRO2VEC = 1
     RAA = 2
     PHYSIOCHEM_PROPERTIES = 3
-    ONE_HOT = 3
+    ONE_HOT = 4
 
 
 def read_data_and_preprocess(datafile="12ca5-MDM2-mCDH2-R3.csv"):
@@ -77,7 +77,6 @@ def build_dataset(
         AA_REPRESENTATION.ONE_HOT,
     ],
 ):
-    global FEATURE_LIST
     pro2vec = np.stack(lib["Pro2Vec"].to_numpy())
     raa = np.stack(lib["RAA"].to_numpy())
     prop = np.stack(lib["prop"].to_numpy())
