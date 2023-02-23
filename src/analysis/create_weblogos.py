@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import pdb
 import matplotlib.pyplot as plt
@@ -9,6 +10,11 @@ from Bio.SeqRecord import SeqRecord
 from Bio.Seq import Seq
 from Bio import SeqIO
 from enum import Enum
+
+# Download the muscle binary https://drive5.com/muscle/downloads_v3.htm
+MUSCLE_ALIGN_CALL = (
+    "/Users/yitongtseo/Documents/GitHub/ml_phage_display/muscle3.8.31_i86darwin64"
+)
 
 
 class Y_AXIS_UNIT(Enum):
@@ -23,7 +29,7 @@ def muscle_align(seqs, seq_record_name, align_name):
         "fasta",
     )
     subprocess.call(
-        "muscle -super5 %s -output %s" % (seq_record_name, align_name),
+        "%s -in %s -out %s -maxiters 1" % (MUSCLE_ALIGN_CALL, seq_record_name, align_name),
         shell=True,
     )
     with open(align_name, "r") as f:
@@ -33,19 +39,31 @@ def muscle_align(seqs, seq_record_name, align_name):
 
 def save_web_logo_alignment(
     seqs,
-    axis,
+    web_logo_name,
+    axis=None,
     seq_record_name="_example.fasta",
     align_name="_align.fasta",
-    web_logo_name="logo.png",
     to_type="counts",
     align=True,
+    title='',
 ):
     if align:
         seqs = muscle_align(seqs, seq_record_name, align_name)
     counts_mat = lm.alignment_to_matrix(seqs, to_type=to_type)
     counts_mat.head()
+    if axis == None:
+        _fig, axis = plt.subplots()
     logo = lm.Logo(counts_mat, ax=axis, color_scheme="hydrophobicity")
-    plt.savefig(web_logo_name)
+    if web_logo_name:
+        plt.savefig(web_logo_name)
+    else:
+        plt.xlabel("Alignment Position")
+        if to_type == "information":
+            plt.ylabel("Information (Bits)")
+        elif to_type == "counts":
+            plt.ylabel("Residue Positional Counts")
+        plt.title(title)
+        plt.show()
 
 
 def generate_weblogos_by_library(
@@ -124,26 +142,26 @@ def generate_weblogos_by_library(
     plt.show()
 
 
-generate_weblogos_by_library(
-    pd.read_csv("mdm2_good.txt"),
-    target_protein_name="MDM2",
-    y_axis_units=Y_AXIS_UNIT.BITS,
-)
-generate_weblogos_by_library(
-    pd.read_csv("12ca5_good.txt"),
-    target_protein_name="12ca5",
-    library_count_threshold=3,
-    y_axis_units=Y_AXIS_UNIT.BITS,
-)
+# generate_weblogos_by_library(
+#     pd.read_csv("mdm2_good.txt"),
+#     target_protein_name="MDM2",
+#     y_axis_units=Y_AXIS_UNIT.BITS,
+# )
+# generate_weblogos_by_library(
+#     pd.read_csv("12ca5_good.txt"),
+#     target_protein_name="12ca5",
+#     library_count_threshold=3,
+#     y_axis_units=Y_AXIS_UNIT.BITS,
+# )
 
-generate_weblogos_by_library(
-    pd.read_csv("mdm2_good.txt"),
-    target_protein_name="MDM2",
-    y_axis_units=Y_AXIS_UNIT.COUNTS,
-)
-generate_weblogos_by_library(
-    pd.read_csv("12ca5_good.txt"),
-    target_protein_name="12ca5",
-    library_count_threshold=3,
-    y_axis_units=Y_AXIS_UNIT.COUNTS,
-)
+# generate_weblogos_by_library(
+#     pd.read_csv("mdm2_good.txt"),
+#     target_protein_name="MDM2",
+#     y_axis_units=Y_AXIS_UNIT.COUNTS,
+# )
+# generate_weblogos_by_library(
+#     pd.read_csv("12ca5_good.txt"),
+#     target_protein_name="12ca5",
+#     library_count_threshold=3,
+#     y_axis_units=Y_AXIS_UNIT.COUNTS,
+# )

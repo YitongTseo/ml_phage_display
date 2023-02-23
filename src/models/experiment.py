@@ -111,7 +111,7 @@ class BinaryClassificationExperiment(Experiment):
         model_architecture,
         optimizer=keras.optimizers.Adam(learning_rate=0.001),
         load_trained_model=False,
-        validation_split=0.1,
+        validation_split=0.0,
         # TODO: yitong do something with model_save_name but dont let experiment over write it...
         model_save_name=None,
     ):
@@ -123,7 +123,7 @@ class BinaryClassificationExperiment(Experiment):
 
         lr_scheduler = keras.callbacks.LearningRateScheduler(scheduler)
         es_scheduler = keras.callbacks.EarlyStopping(
-            monitor="val_loss", mode="min", verbose=1, patience=10 ^ 4
+            monitor="val_loss", mode="min", verbose=1, patience=1000
         )
         if model_save_name is not None:
             mc_scheduler = keras.callbacks.ModelCheckpoint(
@@ -148,8 +148,6 @@ class BinaryClassificationExperiment(Experiment):
                 model_save_name
             ), " either needs to be a .h5 filename or a directory to a .pb file"
             model = keras.models.load_model(model_save_name)
-            # else:
-            #     model = tf.saved_model.load(model_save_name)
         else:
             model = model_architecture(optimizer)
             model.fit(
