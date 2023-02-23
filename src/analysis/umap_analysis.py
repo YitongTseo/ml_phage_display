@@ -16,8 +16,8 @@ import umap
 
 
 def embedding_classification(model, X_train):
-    # nn_emb = model.layers[2](model.layers[1](model.layers[0](X_train)))
-    nn_emb = model.layers[3](model.layers[2](model.layers[1](model.layers[0](X_train))))
+    nn_emb = model.layers[2](model.layers[1](model.layers[0](X_train)))
+    # nn_emb = model.layers[3](model.layers[2](model.layers[1](model.layers[0](X_train))))
     reducer = umap.UMAP(n_neighbors=10, min_dist=0.3, n_components=2)
     reduced_emb = reducer.fit_transform(nn_emb)
     return reduced_emb
