@@ -24,7 +24,7 @@ def generate_heatmap(seqs, title=None):
     seq9_result
 
     fig, ax = plt.subplots(figsize=(5, 10))
-    hm = sns.heatmap(seq9_result, cmap=sns.color_palette("flare", as_cmap=True))
+    hm = sns.heatmap(seq9_result, cmap=sns.color_palette("Blues", as_cmap=True))
     if title:
         fig.suptitle(title)
     return hm
