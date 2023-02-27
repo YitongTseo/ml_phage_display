@@ -30,56 +30,42 @@ class Experiment:
     def run_adhoc_experiment(
         self,
         X,
-        target_y,
-        other_y,
-        peptides,
+        y,
         model_architecture,
         test_train_split=0.2,
         load_trained_model=False,
         model_save_name=None,
         optimizer=keras.optimizers.Adam(learning_rate=0.001),
+        other_datasets=[],
     ):
-        (
-            X_train,
-            X_test,
-            target_y_train,
-            target_y_test,
-            other_y_train,
-            other_y_test,
-            peptides_train,
-            peptides_test,
-        ) = train_test_split(
+        split_datasets = train_test_split(
             X,
-            target_y,
-            other_y,
-            peptides,
+            y,
+            *other_datasets,
             test_size=test_train_split,
             shuffle=True,
             random_state=5,
         )
+        X_train = split_datasets[0]
+        X_test = split_datasets[1]
+        y_train = split_datasets[2]
+        y_test = split_datasets[3]
         model = self.train(
             X_train,
-            target_y_train,
+            y_train,
             model_architecture,
             load_trained_model=load_trained_model,
             model_save_name=model_save_name,
             optimizer=optimizer,
         )
-        y_pred, metrics = self.predict(model, X_test, target_y_test)
+        y_pred, metrics = self.predict(model, X_test, y_test)
         return (
-            X_train,
-            X_test,
-            target_y_train,
-            target_y_test,
-            other_y_train,
-            other_y_test,
-            peptides_train,
-            peptides_test,
+            split_datasets,
             Result(
                 trained_model=model,
                 metrics=metrics,
                 y_pred=y_pred,
-                y_true=target_y_test,
+                y_true=y_test,
             ),
         )
 
@@ -125,7 +111,7 @@ class BinaryClassificationExperiment(Experiment):
         model_architecture,
         optimizer=keras.optimizers.Adam(learning_rate=0.001),
         load_trained_model=False,
-        validation_split=0.1,
+        validation_split=0.0,
         # TODO: yitong do something with model_save_name but dont let experiment over write it...
         model_save_name=None,
     ):
@@ -137,7 +123,7 @@ class BinaryClassificationExperiment(Experiment):
 
         lr_scheduler = keras.callbacks.LearningRateScheduler(scheduler)
         es_scheduler = keras.callbacks.EarlyStopping(
-            monitor="val_loss", mode="min", verbose=1, patience=10 ^ 4
+            monitor="val_loss", mode="min", verbose=1, patience=1000
         )
         if model_save_name is not None:
             mc_scheduler = keras.callbacks.ModelCheckpoint(
@@ -162,8 +148,6 @@ class BinaryClassificationExperiment(Experiment):
                 model_save_name
             ), " either needs to be a .h5 filename or a directory to a .pb file"
             model = keras.models.load_model(model_save_name)
-            # else:
-            #     model = tf.saved_model.load(model_save_name)
         else:
             model = model_architecture(optimizer)
             model.fit(

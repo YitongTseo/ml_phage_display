@@ -26,7 +26,6 @@ from preprocessing.X_representation import (
     seq_to_RAA,
     seq_to_prop,
     seq_to_onehot,
-    MAX_PEPTIDE_LEN,
 )
 from itertools import compress
 from preprocessing.X_representation_utils import (
@@ -36,6 +35,9 @@ from preprocessing.X_representation_utils import (
 from typing import List
 
 FEATURE_LIST = []
+LOG_FC_CUTOFF = 0
+LOG_PVALUE_CUTOFF = -np.log10(0.05)
+MAX_PEPTIDE_LEN = 14
 
 
 class AA_REPRESENTATION(Enum):
@@ -45,7 +47,7 @@ class AA_REPRESENTATION(Enum):
     ONE_HOT = 4
 
 
-def read_data_and_preprocess(datafile="12ca5-MDM2-mCDH2-R3.csv"):
+def read_data_and_preprocess(datafile, nmer_filter=None):
     lib = pd.read_csv(os.path.join(HOME_DIRECTORY, "data", datafile))
 
     # Filter "X" (i.e. unknown residue) containing peptides
@@ -57,6 +59,8 @@ def read_data_and_preprocess(datafile="12ca5-MDM2-mCDH2-R3.csv"):
     lib["is_lle"] = lib["Peptide"].apply(lambda seq: find_3mer(seq, "LLE"))
     lib["c_cnt"] = lib["Peptide"].apply(cnt_c)
 
+    if nmer_filter:
+        lib = lib[lib["Length"] == nmer_filter]
     # Precalculate peptide representations
     lib["Pro2Vec"] = lib.Peptide.apply(seq_to_pro2vec)
     lib["RAA"] = lib.Peptide.apply(seq_to_RAA)
@@ -69,7 +73,6 @@ def build_dataset(
     lib,
     protein_of_interest,
     other_protein,
-    max_len=MAX_PEPTIDE_LEN,
     aa_representations: List[AA_REPRESENTATION] = [
         AA_REPRESENTATION.PRO2VEC,
         AA_REPRESENTATION.RAA,
@@ -84,13 +87,13 @@ def build_dataset(
     peptides = lib["Peptide"].to_list()
 
     # max length = 14, padding O
-    pro2vec = pro2vec.reshape(-1, max_len, 1)
-    raa = raa.reshape(-1, max_len, 1)
+    pro2vec = pro2vec.reshape(-1, MAX_PEPTIDE_LEN, 1)
+    raa = raa.reshape(-1, MAX_PEPTIDE_LEN, 1)
 
     # By creating feature_list on the fly we can ensure it is the correct ordering
     FEATURE_LIST = []
     X = np.array([])
-    X.shape = (len(lib), max_len, 0)
+    X.shape = (len(lib), MAX_PEPTIDE_LEN, 0)
     if AA_REPRESENTATION.PRO2VEC in aa_representations:
         X = np.concatenate((X, pro2vec), axis=-1)
         FEATURE_LIST.append("Pro2Vec")
@@ -125,7 +128,9 @@ def build_dataset(
     y_raw = scaler.transform(y_raw)
     y_classes = np.copy(y_raw)
 
-    log_P_5percent, log_FC_zero = scaler.transform([[-np.log10(0.05), 0]])[0]
+    log_P_5percent, log_FC_zero = scaler.transform(
+        [[LOG_PVALUE_CUTOFF, LOG_FC_CUTOFF]]
+    )[0]
     print(
         " - log P value cutoff is {}, and log FC value cutoff is {}".format(
             log_P_5percent, log_FC_zero
@@ -143,7 +148,7 @@ def build_dataset(
         X, y_classes, y_raw, peptides, random_state=0
     )
 
-    # create Other peptide data by reversing Fold change values
+    # create the other peptide data by reversing fold change values
     # this is acceptable because the class threshold (log_FC_zero)
     # is set to 0, hence classes are symmetric
     other_y_classes = np.copy(y_classes)

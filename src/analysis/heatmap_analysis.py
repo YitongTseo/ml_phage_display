@@ -1,13 +1,16 @@
 import matplotlib.pyplot as plt
 import seaborn as sns
+import pandas as pd
 
-
-def generate_heatmap(seqs, title=None):
+def filter_to_nmers(seqs, nmer_len=9):
     ninemer_seq = []
     for seq in seqs:
-        if len(seq) == 9:
+        if len(seq) == nmer_len:
             ninemer_seq.append(seq[1:])
-    import pandas as pd
+    return ninemer_seq
+
+def generate_heatmap(seqs, title=None):
+    ninemer_seq = filter_to_nmers(seqs, nmer_len=9)
 
     seq9_s = pd.Series(ninemer_seq)
     seq9_s = seq9_s.str.split(r"", expand=True)
@@ -21,7 +24,7 @@ def generate_heatmap(seqs, title=None):
     seq9_result
 
     fig, ax = plt.subplots(figsize=(5, 10))
-    hm = sns.heatmap(seq9_result, cmap=sns.color_palette("flare", as_cmap=True))
+    hm = sns.heatmap(seq9_result, cmap=sns.color_palette("Blues", as_cmap=True))
     if title:
         fig.suptitle(title)
     return hm
