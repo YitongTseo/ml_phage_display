@@ -69,17 +69,7 @@ def read_data_and_preprocess(datafile, nmer_filter=None):
     return lib
 
 
-def build_dataset(
-    lib,
-    protein_of_interest,
-    other_protein,
-    aa_representations: List[AA_REPRESENTATION] = [
-        AA_REPRESENTATION.PRO2VEC,
-        AA_REPRESENTATION.RAA,
-        AA_REPRESENTATION.PHYSIOCHEM_PROPERTIES,
-        AA_REPRESENTATION.ONE_HOT,
-    ],
-):
+def get_X_rep(lib, aa_representations):
     pro2vec = np.stack(lib["Pro2Vec"].to_numpy())
     raa = np.stack(lib["RAA"].to_numpy())
     prop = np.stack(lib["prop"].to_numpy())
@@ -106,6 +96,45 @@ def build_dataset(
     if AA_REPRESENTATION.ONE_HOT in aa_representations:
         X = np.concatenate((X, onehot), axis=-1)
         FEATURE_LIST += AA_ONE_HOT_ORDERING
+    return X, FEATURE_LIST, peptides
+
+
+def build_er_dataset(
+    lib,
+    aa_representations: List[AA_REPRESENTATION] = [
+        AA_REPRESENTATION.PRO2VEC,
+        AA_REPRESENTATION.RAA,
+        AA_REPRESENTATION.PHYSIOCHEM_PROPERTIES,
+        AA_REPRESENTATION.ONE_HOT,
+    ],
+    er_threshold=0
+):
+    X, FEATURE_LIST, peptides = get_X_rep(lib, aa_representations)
+
+    y_raw = lib['ER'].to_numpy().reshape(-1, 1)
+    # scaler = StandardScaler()
+    # scaler.fit(y_raw)
+    # y_raw = scaler.transform(y_raw)
+
+    X, y_raw, peptides = shuffle(
+        X, y_raw, peptides, random_state=0
+    )
+    y_classes = y_raw > er_threshold
+    return X, y_classes, y_raw, peptides, FEATURE_LIST
+
+
+def build_dataset(
+    lib,
+    protein_of_interest,
+    other_protein,
+    aa_representations: List[AA_REPRESENTATION] = [
+        AA_REPRESENTATION.PRO2VEC,
+        AA_REPRESENTATION.RAA,
+        AA_REPRESENTATION.PHYSIOCHEM_PROPERTIES,
+        AA_REPRESENTATION.ONE_HOT,
+    ],
+):
+    X, FEATURE_LIST, peptides = get_X_rep(lib, aa_representations)
 
     y_raw = formulate_two_channel_regression_labels(
         lib, protein_of_interest, other_protein
