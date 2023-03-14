@@ -142,6 +142,87 @@ def Joint_BinaryClassificationRNN_gelu(optimizer):
 
 
 
+def SingleChannelRegressionRNN(optimizer):
+    # create model
+    model = Sequential()
+    model.add(layers.Dense(16))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Activation(activations.tanh))
+    model.add(layers.Dropout(0.01))
+
+    model.add(layers.Bidirectional(layers.LSTM(16)))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Activation(activations.tanh))
+    model.add(layers.Dropout(0.01))
+
+    model.add(layers.Dense(16))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Activation(activations.tanh))
+    model.add(layers.Dropout(0.01))
+
+    model.add(layers.Dense(8))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Activation(activations.tanh))
+    model.add(layers.Dropout(0.01))
+
+    model.add(layers.Dense(4, activation="tanh"))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Activation(activations.tanh))
+    model.add(layers.Dropout(0.01))
+
+    model.add(
+        layers.Dense(1, activation=None, kernel_initializer="normal", use_bias=True)
+    )
+    # Compile model
+    model.compile(
+        optimizer=optimizer,
+        loss="mse",
+        metrics=[mean_squared_error],
+        run_eagerly=True,
+    )
+    return model
+
+def SingleRegressionRNN_gelu(optimizer):
+    # create model
+    model = Sequential()
+     
+    model.add(layers.Dense(32, kernel_initializer="he_uniform"))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Activation(activations.gelu))
+    model.add(layers.Dropout(0.01))
+
+    model.add(layers.Bidirectional(layers.LSTM(32)))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Activation(activations.gelu))
+    model.add(layers.Dropout(0.01))
+
+    model.add(layers.Dense(16, kernel_initializer="he_uniform"))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Activation(activations.gelu))
+    model.add(layers.Dropout(0.01))
+
+    model.add(layers.Dense(8, kernel_initializer="he_uniform"))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Activation(activations.gelu))
+    model.add(layers.Dropout(0.01))
+
+    model.add(layers.Dense(4, kernel_initializer="he_uniform"))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Activation(activations.gelu))
+    model.add(layers.Dropout(0.01))
+
+    model.add(
+        layers.Dense(1,  kernel_initializer="normal", use_bias=True)
+    )
+    # Compile model
+    model.compile(
+        optimizer=optimizer,
+        loss="mse",
+        metrics=[rmse],
+        run_eagerly=True,
+    )
+    return model
+
 def Joint_BinaryClassificationCNN_gelu(optimizer):
     # create model
     model = Sequential()
