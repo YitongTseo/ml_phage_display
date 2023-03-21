@@ -107,18 +107,15 @@ def build_er_dataset(
         AA_REPRESENTATION.PHYSIOCHEM_PROPERTIES,
         AA_REPRESENTATION.ONE_HOT,
     ],
-    er_threshold=0
+    er_threshold=0,
+    shuffle_data=True,
 ):
     X, FEATURE_LIST, peptides = get_X_rep(lib, aa_representations)
 
-    y_raw = lib['ER'].to_numpy().reshape(-1, 1)
-    # scaler = StandardScaler()
-    # scaler.fit(y_raw)
-    # y_raw = scaler.transform(y_raw)
+    y_raw = lib["ER"].to_numpy().reshape(-1, 1)
 
-    X, y_raw, peptides = shuffle(
-        X, y_raw, peptides, random_state=0
-    )
+    if shuffle_data:
+        X, y_raw, peptides = shuffle(X, y_raw, peptides, random_state=0)
     y_classes = y_raw > er_threshold
     return X, y_classes, y_raw, peptides, FEATURE_LIST
 
@@ -133,6 +130,7 @@ def build_dataset(
         AA_REPRESENTATION.PHYSIOCHEM_PROPERTIES,
         AA_REPRESENTATION.ONE_HOT,
     ],
+    shuffle_data=True
 ):
     X, FEATURE_LIST, peptides = get_X_rep(lib, aa_representations)
 
@@ -173,9 +171,10 @@ def build_dataset(
     assert (
         len(np.argwhere(np.isnan(y_raw))) == 0
     ), "we dont want any nans in our y-label dataset"
-    X, y_classes, y_raw, peptides = shuffle(
-        X, y_classes, y_raw, peptides, random_state=0
-    )
+    if shuffle_data:
+        X, y_classes, y_raw, peptides = shuffle(
+            X, y_classes, y_raw, peptides, random_state=0
+        )
 
     # create the other peptide data by reversing fold change values
     # this is acceptable because the class threshold (log_FC_zero)
@@ -186,3 +185,42 @@ def build_dataset(
     other_y_raw = np.copy(y_raw)
     other_y_raw[:, 1] = -other_y_raw[:, 1]
     return X, y_classes, y_raw, other_y_classes, other_y_raw, peptides, FEATURE_LIST
+
+
+def build_joint_dataset(
+    er_datafile,
+    volcano_datafile,
+    protein_of_interest,
+    other_protein,
+    aa_representations: List[AA_REPRESENTATION] = [
+        AA_REPRESENTATION.PRO2VEC,
+        AA_REPRESENTATION.RAA,
+        AA_REPRESENTATION.PHYSIOCHEM_PROPERTIES,
+        AA_REPRESENTATION.ONE_HOT,
+    ],
+):
+    er_lib = read_data_and_preprocess(datafile=er_datafile)
+    volcano_lib = read_data_and_preprocess(datafile=volcano_datafile)
+    joint_lib = er_lib.merge(
+        right=volcano_lib, right_on="Peptide", left_on="Peptide", suffixes=("x", "")
+    )
+
+    X, FEATURE_LIST, peptides = get_X_rep(joint_lib, aa_representations)
+    fc_pval_y_raw = formulate_two_channel_regression_labels(
+        joint_lib, protein_of_interest, other_protein
+    )
+    er_y_raw = joint_lib["ER"].to_numpy().reshape(-1, 1)
+    y_raw = np.hstack((fc_pval_y_raw, er_y_raw))
+
+    # Remove nans ... aka when p-value = nan (aka when cadherin is the only binder)
+    nans_mask = ~np.isnan(y_raw).any(axis=1)
+    # Remove negative infinity ... aka when p-value = 0
+    neg_inf_mask = ~(y_raw == -np.inf).any(axis=1)
+    mask = np.logical_and(nans_mask, neg_inf_mask)
+    X = X[mask]
+    peptides = list(compress(peptides, mask))
+    y_raw = y_raw[mask]
+
+    # log p-value into -log p-value
+    y_raw[:, 0] = -y_raw[:, 0]
+    return X, y_raw, peptides
