@@ -17,12 +17,76 @@ def fold_rmse(y_true, y_pred):
     return mean_squared_error(y_true_fold, y_pred_fold)
 
 
-def two_channel_mse(y_true, y_pred):
+def er_rmse(y_true, y_pred):
+    y_true_fold = y_true[:, 2]
+    y_pred_fold = y_pred[:, 2]
+    return mean_squared_error(y_true_fold, y_pred_fold)
+
+
+def multi_channel_mse(y_true, y_pred):
     # scales are not similar
-    squared_difference = tf.square(y_true - y_pred)
+    squared_difference = tf.math.abs(y_true - y_pred) ** 2  # ** 4
     return tf.reduce_mean(squared_difference, axis=-1)
 
-def TwoChannelRegressionRNN(optimizer):
+
+def multi_channel_rmse(y_true, y_pred):
+    return tf.math.sqrt(multi_channel_mse(y_true, y_pred))
+
+
+def ThreeChannelRegressionRNN_gelu(optimizer, width=64, depth=6, dropout=0.1):
+    """
+    We give the model O(2^param_power) number of params...
+    Implicit regularlization
+    """
+    # create model
+    model = Sequential()
+    assert width >= 16, "Can't have parameters go too low (>= 5 please)"
+    assert depth >= 6, "Can't have depth go too low (>= 5 please)"
+
+    model.add(layers.Dense(width, kernel_initializer="he_uniform"))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Activation(activations.gelu))
+    model.add(layers.Dropout(dropout))
+
+    model.add(layers.Bidirectional(layers.LSTM(width)))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Activation(activations.gelu))
+    model.add(layers.Dropout(dropout))
+
+    for depth_idx in range(depth - 6):
+        model.add(layers.Dense(width, kernel_initializer="he_uniform"))
+        model.add(layers.BatchNormalization())
+        model.add(layers.Activation(activations.gelu))
+        model.add(layers.Dropout(dropout))
+        
+    model.add(layers.Dense(int(width / 2), kernel_initializer="he_uniform"))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Activation(activations.gelu))
+    model.add(layers.Dropout(dropout))
+
+    model.add(layers.Dense(int(width / 4), kernel_initializer="he_uniform"))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Activation(activations.gelu))
+    model.add(layers.Dropout(dropout))
+
+    model.add(layers.Dense(int(width / 8), kernel_initializer="he_uniform"))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Activation(activations.gelu))
+    model.add(layers.Dropout(dropout))
+
+    model.add(layers.Dense(3, kernel_initializer="normal", use_bias=True))
+    # Compile model
+    model.compile(
+        optimizer=optimizer,
+        loss=er_rmse,#multi_channel_mse,
+        metrics=[multi_channel_mse, fold_rmse, p_value_rmse, er_rmse],
+        run_eagerly=True,
+    )
+
+    return model
+
+
+def ThreeChannelRegressionRNN(optimizer):
     # create model
     model = Sequential()
     model.add(layers.Dense(16))
@@ -51,17 +115,16 @@ def TwoChannelRegressionRNN(optimizer):
     model.add(layers.Dropout(0.01))
 
     model.add(
-        layers.Dense(2, activation=None, kernel_initializer="normal", use_bias=True)
+        layers.Dense(3, activation=None, kernel_initializer="normal", use_bias=True)
     )
     # Compile model
     model.compile(
         optimizer=optimizer,
-        loss=two_channel_mse,
-        metrics=[two_channel_mse, fold_rmse, p_value_rmse],
+        loss=multi_channel_mse,
+        metrics=[multi_channel_mse, fold_rmse, p_value_rmse, er_rmse],
         run_eagerly=True,
     )
     return model
-
 
 
 def SingleChannelRegressionRNN(optimizer):
@@ -123,6 +186,7 @@ def BinaryClassificationRNN(optimizer):
     )
     return model
 
+
 def Joint_BinaryClassificationRNN_gelu(optimizer):
     # create model
     model = Sequential()
@@ -141,11 +205,91 @@ def Joint_BinaryClassificationRNN_gelu(optimizer):
     return model
 
 
+def SingleChannelRegressionRNN(optimizer):
+    # create model
+    model = Sequential()
+    model.add(layers.Dense(16))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Activation(activations.tanh))
+    model.add(layers.Dropout(0.01))
+
+    model.add(layers.Bidirectional(layers.LSTM(16)))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Activation(activations.tanh))
+    model.add(layers.Dropout(0.01))
+
+    model.add(layers.Dense(16))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Activation(activations.tanh))
+    model.add(layers.Dropout(0.01))
+
+    model.add(layers.Dense(8))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Activation(activations.tanh))
+    model.add(layers.Dropout(0.01))
+
+    model.add(layers.Dense(4, activation="tanh"))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Activation(activations.tanh))
+    model.add(layers.Dropout(0.01))
+
+    model.add(
+        layers.Dense(1, activation=None, kernel_initializer="normal", use_bias=True)
+    )
+    # Compile model
+    model.compile(
+        optimizer=optimizer,
+        loss="mse",
+        metrics=[mean_squared_error],
+        run_eagerly=True,
+    )
+    return model
+
+
+def SingleRegressionRNN_gelu(optimizer):
+    # create model
+    model = Sequential()
+
+    model.add(layers.Dense(32, kernel_initializer="he_uniform"))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Activation(activations.gelu))
+    model.add(layers.Dropout(0.01))
+
+    model.add(layers.Bidirectional(layers.LSTM(32)))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Activation(activations.gelu))
+    model.add(layers.Dropout(0.01))
+
+    model.add(layers.Dense(16, kernel_initializer="he_uniform"))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Activation(activations.gelu))
+    model.add(layers.Dropout(0.01))
+
+    model.add(layers.Dense(8, kernel_initializer="he_uniform"))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Activation(activations.gelu))
+    model.add(layers.Dropout(0.01))
+
+    model.add(layers.Dense(4, kernel_initializer="he_uniform"))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Activation(activations.gelu))
+    model.add(layers.Dropout(0.01))
+
+    model.add(layers.Dense(1, kernel_initializer="normal", use_bias=True))
+    # Compile model
+    model.compile(
+        optimizer=optimizer,
+        loss="mse",
+        metrics=[multi_channel_mse],
+        run_eagerly=True,
+    )
+    return model
+
 
 def Joint_BinaryClassificationCNN_gelu(optimizer):
     # create model
     model = Sequential()
-    model.add(layers.Conv1D(16, 3, activation='relu',  input_shape=(14,16)))
+    model.add(layers.Conv1D(16, 3, activation="relu", input_shape=(14, 16)))
     model.add(layers.MaxPooling1D(pool_size=2))
     model.add(layers.Flatten())
     model.add(layers.Dense(16, activation="gelu"))
@@ -159,5 +303,3 @@ def Joint_BinaryClassificationCNN_gelu(optimizer):
         metrics=["accuracy", Recall(), Precision()],
     )
     return model
-
-

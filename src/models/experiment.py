@@ -14,8 +14,10 @@ from sklearn.metrics import confusion_matrix
 from typing import Optional, Any
 from dataclasses import dataclass
 from sklearn.model_selection import train_test_split
-from models.rnn import two_channel_mse, p_value_rmse, fold_rmse
+from models.rnn import multi_channel_mse, p_value_rmse, fold_rmse, er_rmse, multi_channel_rmse
 from tensorflow.keras.metrics import mean_squared_error
+from tensorflow.keras.utils import custom_object_scope
+from sklearn.preprocessing import StandardScaler
 
 
 @dataclass
@@ -27,6 +29,7 @@ class Result:
 
 
 class Experiment:
+
     def run_adhoc_experiment(
         self,
         X,
@@ -37,6 +40,9 @@ class Experiment:
         model_save_name=None,
         optimizer=keras.optimizers.Adam(learning_rate=0.001),
         other_datasets=[],
+        normalize=False,
+        batch_size=128,
+        num_epochs=20,
     ):
         split_datasets = train_test_split(
             X,
@@ -50,6 +56,13 @@ class Experiment:
         X_test = split_datasets[1]
         y_train = split_datasets[2]
         y_test = split_datasets[3]
+
+        if normalize:
+            yscaler = StandardScaler()
+            yscaler.fit(y_train)
+            y_train = yscaler.transform(y_train)
+            y_test = yscaler.transform(y_test)
+        print('we are in here?')
         model = self.train(
             X_train,
             y_train,
@@ -57,6 +70,8 @@ class Experiment:
             load_trained_model=load_trained_model,
             model_save_name=model_save_name,
             optimizer=optimizer,
+            batch_size=batch_size,
+            num_epochs=num_epochs,
         )
         y_pred, metrics = self.predict(model, X_test, y_test)
         return (
@@ -69,16 +84,26 @@ class Experiment:
             ),
         )
 
-    def run_cross_validation_experiment(self, X, y, model_architecture, n_splits=5):
+    def run_cross_validation_experiment(self, X, y, model_architecture, optimizer, n_splits=5, model_save_name=None, normalize=True, batch_size=128, num_epochs=20):
         kf = KFold(n_splits=n_splits)
         results = []
-        for train_index, test_index in kf.split(X):
+        for split_idx, (train_index, test_index) in enumerate(kf.split(X)):
             X_train, X_test = X[train_index], X[test_index]
             y_train, y_test = y[train_index], y[test_index]
+            if normalize:
+                yscaler = StandardScaler()
+                yscaler.fit(y_train)
+                y_train = yscaler.transform(y_train)
+                y_test = yscaler.transform(y_test)
+
             model = self.train(
                 X_train,
                 y_train,
                 model_architecture,
+                batch_size=batch_size,
+                optimizer=optimizer(),
+                num_epochs=num_epochs,
+                model_save_name=model_save_name + str(split_idx),
             )
             y_pred, metrics = self.predict(model, X_test, y_test)
             results.append(
@@ -89,20 +114,7 @@ class Experiment:
                     y_true=y_test,
                 )
             )
-        return results
-
-    def train():
-        pass
-
-    def predict():
-        pass
-
-
-class BinaryClassificationExperiment(Experiment):
-    epochs = 50
-
-    def __init__(self) -> None:
-        super().__init__()
+        return results, yscaler
 
     def train(
         self,
@@ -111,23 +123,26 @@ class BinaryClassificationExperiment(Experiment):
         model_architecture,
         optimizer=keras.optimizers.Adam(learning_rate=0.001),
         load_trained_model=False,
+        batch_size=128,
         validation_split=0.0,
         # TODO: yitong do something with model_save_name but dont let experiment over write it...
         model_save_name=None,
+        num_epochs=20,
     ):
         def scheduler(epoch, lr):
-            if epoch < 5:
+            if epoch < 5: #20:
                 return lr
             else:
                 return lr * tf.math.exp(-0.1)
 
         lr_scheduler = keras.callbacks.LearningRateScheduler(scheduler)
         es_scheduler = keras.callbacks.EarlyStopping(
-            monitor="val_loss", mode="min", verbose=1, patience=1000
+            monitor="multi_channel_mse", mode="min", verbose=1, patience=5, #restore_best_weights=True,
+
         )
         if model_save_name is not None:
             mc_scheduler = keras.callbacks.ModelCheckpoint(
-                model_save_name, monitor="val_loss", mode="min"
+                model_save_name, monitor="val_loss", mode="min", save_freq='epoch'
             )
         else:
             mc_scheduler = None
@@ -147,15 +162,24 @@ class BinaryClassificationExperiment(Experiment):
             assert ".h5" in model_save_name or os.path.isdir(
                 model_save_name
             ), " either needs to be a .h5 filename or a directory to a .pb file"
-            model = keras.models.load_model(model_save_name)
+            with custom_object_scope(
+                {
+                    "rmse": multi_channel_rmse,
+                    "multi_channel_mse": multi_channel_mse,
+                    "fold_rmse": fold_rmse,
+                    "p_value_rmse": p_value_rmse,
+                    "er_rmse": er_rmse,
+                }
+            ):
+                model = keras.models.load_model(model_save_name)
         else:
             model = model_architecture(optimizer)
             model.fit(
                 x=X_train,
                 y=y_train,
                 validation_data=(X_val, y_val),
-                batch_size=128,
-                epochs=self.epochs,
+                batch_size=batch_size,
+                epochs=num_epochs,
                 verbose="auto",
                 initial_epoch=0,
                 # class_weight={1: 0.5, 0: 0.5},
@@ -165,6 +189,19 @@ class BinaryClassificationExperiment(Experiment):
                 + ([mc_scheduler] if mc_scheduler is not None else []),
             )
         return model
+
+    def predict(self, model, X_test, y_true):
+        y_pred = model(X_test)
+        return y_pred, {
+            # "total_mse": multi_channel_mse(y_true, y_pred),
+            # "p_value_rmse": p_value_rmse(y_true, y_pred),
+            # "fold_rmse": fold_rmse(y_true, y_pred),
+        }
+
+
+class BinaryClassificationExperiment(Experiment):
+    def __init__(self) -> None:
+        super().__init__()
 
     def predict(self, model, X_test, y_true):
         # TODO(Yitong) We probably want to use evaluation.classifcation_evaluation here...
