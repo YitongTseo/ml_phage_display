@@ -3,97 +3,125 @@ import sys
 HOME_DIRECTORY = pathlib.Path().absolute()
 sys.path.append(str(HOME_DIRECTORY) + '/src')
 
-import umap
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
-from sklearn.model_selection import KFold
-from sklearn.metrics import confusion_matrix
-from sklearn.utils import shuffle
 from matplotlib import pyplot as plt
-from sklearn.model_selection import train_test_split
+import plotly.graph_objects as go
+from mpl_toolkits.mplot3d import Axes3D
+import matplotlib.patches as mpatches
+import pdb
 
-def scatter_hist(x, y, ax, ax_histx, ax_histy, alpha=0.1):
-    # no labels
-    ax_histx.tick_params(axis="x", labelbottom=False)
-    ax_histy.tick_params(axis="y", labelleft=False)
+TRUE_POSITIVE = (0, 1, 0, 0.5)
+FALSE_POSITIVE = (0, 0, 1, 0.5)
+FALSE_NEGATIVE = (1, 0, 0, 0.5)
+TRUE_NEGATIVE = (0.8, 0.8, 0.8, 0.3)
 
-    # the scatter plot:
-    ax.scatter(x, y, alpha=alpha)
-
-    # now determine nice limits by hand:
-    binwidth = 0.1
-    xymax = max(np.max(np.abs(x)), np.max(np.abs(y)))
-    lim = (int(xymax/binwidth) + 1) * binwidth
-
-    bins = np.arange(-lim, lim + binwidth, binwidth)
-    ax_histx.hist(x, bins=bins)
-    ax_histy.hist(y, bins=bins, orientation='horizontal')
-
-def show_volcano(y, protein_of_interest, other_protein, title_addendum=""):
-    # Create a Figure, which doesn't have to be square.
-    fig = plt.figure(constrained_layout=True)
-    # Create the main axes, leaving 25% of the figure space at the top and on the
-    # right to position marginals.
-    ax = fig.add_gridspec(top=0.75, right=0.75).subplots()
-    # The main axes' aspect can be fixed.
-    ax.set(aspect=1)
-    # Create marginal axes, which have 25% of the size of the main axes.  Note that
-    # the inset axes are positioned *outside* (on the right and the top) of the
-    # main axes, by specifying axes coordinates greater than 1.  Axes coordinates
-    # less than 0 would likewise specify positions on the left and the bottom of
-    # the main axes.
-    ax_histx = ax.inset_axes([0, 1.05, 1, 0.25], sharex=ax)
-    ax_histy = ax.inset_axes([1.05, 0, 0.25, 1], sharey=ax)
-    # Draw the scatter plot and marginals.
-    scatter_hist(y[:, 1], y[:, 0], ax, ax_histx, ax_histy)
-    ax.set_ylabel("- p-value")
-    ax.set_xlabel("log fold")
-    ax.set_title(
-        title_addendum
-        + protein_of_interest
-        + " vs "
-        + other_protein
-        + "\n(normalized by mean & std. dev)"
+def plot_relations_in_plotly(x_idx, y_idx, peptides, datapoints, vals=["Pval", "FC", "ER"]):
+    fig = go.Figure(
+        [
+            go.Scatter(
+                x=datapoints[:, x_idx],
+                y=datapoints[:, y_idx],
+                text=peptides,
+                mode="markers",
+            )
+        ]
     )
-    plt.show()
+    fig.show()
 
 
-def Kfold_sample(n_splits, stop_split, X, y): 
-    # TODO: I don't think this entirely correct since we need the same seed number
-    # for KFold if we want the same splits, unless it doesn't shuffle the splits which I think it might
-    kf = KFold(n_splits=n_splits)
-    i = 0
-    for train_index, test_index in kf.split(X):
-        X_train, X_test = X[train_index], X[test_index]
-        y_f_train, y_f_test = y[:,1][train_index], y[:,1][test_index]
-        y_p_train, y_p_test = y[:,0][train_index], y[:,0][test_index]
-
-        if i==stop_split:
-            break
-        i += 1  
-    return X_train, X_test, y_f_train, y_f_test, y_p_train, y_p_test
-
-def train_test_split_sample(X, y): 
-    (X_train, X_test, y_train, y_test) = train_test_split(
-        X,
-        y,
-        test_size=0.2,
-        shuffle=True,
-        random_state=5,
-    )
-    y_f_train, y_f_test = y_train[:,1], y_test[:,1]
-    y_p_train, y_p_test = y_train[:,0], y_test[:,0]
-    return X_train, X_test, y_f_train, y_f_test, y_p_train, y_p_test
-
-
-def Predicted_vs_actual_plot(y_true, y_train, color, y_true_label, y_train_label, color_label):
-    plt.xlabel("true {} value".format(y_true_label))
-    plt.ylabel("predicted {} value".format(y_train_label))
-    plt.scatter(y_true, y_train, c=color, cmap='bwr',alpha=0.2)
-    plt.title("label by {} value".format(color_label))
-    plt.colorbar()
-    plt.show()
+def plot_relations(
+    x_idx, y_idx, datapoints, ordering, all_positives, kind="hex", vals=["Pval", "FC", "ER"], top_k=500
+):
+    g = sns.jointplot(x=datapoints[:, x_idx], y=datapoints[:, y_idx], kind=kind)
+    plt.xlabel(vals[x_idx])
+    plt.ylabel(vals[y_idx])
+    plt.title(vals[x_idx] + ' vs ' + vals[y_idx])
     
+    if ordering is not None and all_positives is not None:
+        g.ax_joint.cla()
+        top_k_mask = ordering >= np.partition(ordering, kth=-top_k)[-top_k]
+        colors = []
+        for datapoint, is_true, is_in_top_k in zip(datapoints, all_positives, top_k_mask):
+            if is_true and is_in_top_k:
+                colors.append(TRUE_POSITIVE) 
+
+            if is_true and not is_in_top_k:
+                colors.append(FALSE_NEGATIVE) 
+
+            if not is_true and is_in_top_k:
+                colors.append(FALSE_POSITIVE) 
+
+            if not is_true and not is_in_top_k:
+                colors.append(TRUE_NEGATIVE)
+
+        plt.scatter(
+            x=datapoints[:, x_idx],
+            y=datapoints[:, y_idx],
+            c=colors,
+        )
+        
+        g.ax_joint.legend(handles=[
+            mpatches.Patch(color=TRUE_POSITIVE, label='True Positive (peptide hit in top 500)'),
+            mpatches.Patch(color=FALSE_POSITIVE, label='False Positive (peptide miss in top 500)'),
+            mpatches.Patch(color=FALSE_NEGATIVE, label='False Negative (peptide hit not in top 500)'),
+            mpatches.Patch(color=TRUE_NEGATIVE, label='True Negative (peptide miss not in top 500)'),
+        ],loc='best')
+    plt.show()
 
 
+def plot_relations_in_3D(
+    x_idx,
+    y_idx,
+    uncertainty,
+    datapoints,
+    ordering,
+    all_positives,
+    title="",
+    vals=["Pval", "FC", "ER"],
+    top_k=500,
+):
+    sns.set_style("whitegrid", {"axes.grid": False})
+    fig = plt.figure(figsize=(6, 6))
+
+    ax = Axes3D(fig)
+    if ordering is not None and all_positives is not None:
+        top_k_mask = ordering >= np.partition(ordering, kth=-top_k)[-top_k]
+        colors = []
+        for is_true, is_in_top_k in zip(all_positives, top_k_mask):
+            if is_true and is_in_top_k:
+                colors.append(TRUE_POSITIVE) 
+            
+            if is_true and not is_in_top_k:
+                colors.append(FALSE_NEGATIVE) 
+
+            if not is_true and is_in_top_k:
+                colors.append(FALSE_POSITIVE) 
+
+            if not is_true and not is_in_top_k:
+                colors.append(TRUE_NEGATIVE)
+
+        ax.legend(handles=[
+            mpatches.Patch(color=TRUE_POSITIVE, label='True Positive (peptide hit in top 500)'),
+            mpatches.Patch(color=FALSE_POSITIVE, label='False Positive (peptide miss in top 500)'),
+            mpatches.Patch(color=FALSE_NEGATIVE, label='False Negative (peptide hit not in top 500)'),
+            mpatches.Patch(color=TRUE_NEGATIVE, label='True Negative (peptide miss not in top 500)'),
+        ])
+    else:
+        colors = uncertainty
+
+    ax.scatter(
+        xs=datapoints[:, x_idx],
+        ys=datapoints[:, y_idx],
+        zs=uncertainty,
+        c=colors,
+        marker="o",
+    )
+    ax.set_xlabel("Pred " + vals[x_idx])
+    ax.set_ylabel("Pred " + vals[y_idx])
+    ax.set_zlabel("Uncertainty")
+
+    plt.title(title)
+    # ax.view_init(elev=10.0, azim=90)
+    plt.show()

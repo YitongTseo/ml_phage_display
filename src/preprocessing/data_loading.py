@@ -223,4 +223,6 @@ def build_joint_dataset(
 
     # log p-value into -log p-value
     y_raw[:, 0] = -y_raw[:, 0]
+
+    X, y_raw, peptides = shuffle(X, y_raw, peptides, random_state=0)
     return X, y_raw, peptides

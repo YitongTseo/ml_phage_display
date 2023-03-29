@@ -5,27 +5,25 @@ HOME_DIRECTORY = pathlib.Path().absolute()
 sys.path.append(str(HOME_DIRECTORY) + "/src")
 
 import os
-import pdb
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 from sklearn.model_selection import KFold
-from sklearn.metrics import confusion_matrix
 from typing import Optional, Any
 from dataclasses import dataclass
 from sklearn.model_selection import train_test_split
-from models.rnn import multi_channel_mse, p_value_rmse, fold_rmse, er_rmse, multi_channel_rmse
-from tensorflow.keras.metrics import mean_squared_error
+from models.rnn import multi_channel_mse, p_value_rmse, fold_rmse, er_rmse
 from tensorflow.keras.utils import custom_object_scope
 from sklearn.preprocessing import StandardScaler
 
-
 @dataclass
 class Result:
-    metrics: dict[str, Any] = None
+    metrics: Any = None
     trained_model: Optional[Any] = None
     y_pred: Optional[np.array] = None
-    y_true: Optional[np.array] = None
+    y_test: Optional[np.array] = None
+    X_test: Optional[np.array] = None
+    yscaler: Optional[StandardScaler] = None
 
 
 class Experiment:
@@ -62,7 +60,6 @@ class Experiment:
             yscaler.fit(y_train)
             y_train = yscaler.transform(y_train)
             y_test = yscaler.transform(y_test)
-        print('we are in here?')
         model = self.train(
             X_train,
             y_train,
@@ -80,11 +77,23 @@ class Experiment:
                 trained_model=model,
                 metrics=metrics,
                 y_pred=y_pred,
-                y_true=y_test,
+                y_test=y_test,
             ),
         )
 
-    def run_cross_validation_experiment(self, X, y, model_architecture, optimizer, n_splits=5, model_save_name=None, normalize=True, batch_size=128, num_epochs=20):
+    def run_cross_validation_experiment(
+        self, 
+        X, 
+        y, 
+        model_architecture, 
+        optimizer, 
+        n_splits=5, 
+        load_trained_model=False, 
+        model_save_name=None, 
+        normalize=True, 
+        batch_size=128, 
+        num_epochs=5
+    ):
         kf = KFold(n_splits=n_splits)
         results = []
         for split_idx, (train_index, test_index) in enumerate(kf.split(X)):
@@ -93,28 +102,31 @@ class Experiment:
             if normalize:
                 yscaler = StandardScaler()
                 yscaler.fit(y_train)
-                y_train = yscaler.transform(y_train)
-                y_test = yscaler.transform(y_test)
+                y_train_scaled = yscaler.transform(y_train)
+                y_test_saled = yscaler.transform(y_test)
 
             model = self.train(
                 X_train,
-                y_train,
+                y_train_scaled,
                 model_architecture,
+                load_trained_model=load_trained_model,
                 batch_size=batch_size,
                 optimizer=optimizer(),
                 num_epochs=num_epochs,
                 model_save_name=model_save_name + str(split_idx),
             )
-            y_pred, metrics = self.predict(model, X_test, y_test)
+            y_pred, metrics = self.predict(model, X_test, y_test_saled)
             results.append(
                 Result(
                     trained_model=model,
                     metrics=metrics,
                     y_pred=y_pred,
-                    y_true=y_test,
+                    y_test=y_test,
+                    X_test=X_test,
+                    yscaler=yscaler,
                 )
             )
-        return results, yscaler
+        return results
 
     def train(
         self,
@@ -125,12 +137,11 @@ class Experiment:
         load_trained_model=False,
         batch_size=128,
         validation_split=0.0,
-        # TODO: yitong do something with model_save_name but dont let experiment over write it...
         model_save_name=None,
         num_epochs=20,
     ):
         def scheduler(epoch, lr):
-            if epoch < 5: #20:
+            if epoch < 5:
                 return lr
             else:
                 return lr * tf.math.exp(-0.1)
@@ -164,7 +175,6 @@ class Experiment:
             ), " either needs to be a .h5 filename or a directory to a .pb file"
             with custom_object_scope(
                 {
-                    "rmse": multi_channel_rmse,
                     "multi_channel_mse": multi_channel_mse,
                     "fold_rmse": fold_rmse,
                     "p_value_rmse": p_value_rmse,
@@ -193,16 +203,8 @@ class Experiment:
     def predict(self, model, X_test, y_true):
         y_pred = model(X_test)
         return y_pred, {
-            # "total_mse": multi_channel_mse(y_true, y_pred),
-            # "p_value_rmse": p_value_rmse(y_true, y_pred),
-            # "fold_rmse": fold_rmse(y_true, y_pred),
+            "total_mse": multi_channel_mse(y_true, y_pred),
+            "p_value_rmse": p_value_rmse(y_true, y_pred),
+            "fold_rmse": fold_rmse(y_true, y_pred),
+            'er_rmse': er_rmse(y_true, y_pred),
         }
-
-
-class BinaryClassificationExperiment(Experiment):
-    def __init__(self) -> None:
-        super().__init__()
-
-    def predict(self, model, X_test, y_true):
-        # TODO(Yitong) We probably want to use evaluation.classifcation_evaluation here...
-        return [], {}
