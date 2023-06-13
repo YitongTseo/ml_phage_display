@@ -13,13 +13,18 @@ from sklearn.metrics import confusion_matrix
 from sklearn.utils import shuffle
 from matplotlib import pyplot as plt
 import umap
+import pdb
 
 
-def embedding_classification(model, X_train):
-    nn_emb = model.layers[2](model.layers[1](model.layers[0](X_train)))
-    # nn_emb = model.layers[3](model.layers[2](model.layers[1](model.layers[0](X_train))))
+def embedding_classification(model, X, layer_depth=10):
+    nn_emb = X
+    for layer in model.layers[:layer_depth]:
+        nn_emb = layer(nn_emb)
+
+    # nn_emb = model.layers[2](model.layers[1](model.layers[0](X)))
+    # nn_emb = model.layers[3](model.layers[2](model.layers[1](model.layers[0](X))))
     reducer = umap.UMAP(
-        n_neighbors=20, min_dist=0.5, n_components=2, transform_seed=42, random_state=42
+        n_neighbors=10, min_dist=0.5, n_components=2, transform_seed=42, random_state=42
     )
     reduced_emb = reducer.fit_transform(nn_emb)
     return reduced_emb
@@ -71,7 +76,38 @@ def UMAP_vis(embedding, y_train, title, rectangle=None):
     ax = sns.scatterplot(x=embedding[:, 0], y=embedding[:, 1], hue=y_train, alpha=0.1)
     if rectangle:
         ax.add_patch(rectangle)
+
+    ax.legend(loc="center left", bbox_to_anchor=(1.25, 0.5), ncol=1)
     plt.title(title)
+    plt.show()
+
+
+# tests label with FC value
+def UMAP_vis(embedding, y_train, title, rectangle=None):
+    ax = sns.scatterplot(x=embedding[:, 0], y=embedding[:, 1], hue=y_train, alpha=0.1)
+    if rectangle:
+        ax.add_patch(rectangle)
+
+    ax.legend(loc="center left", bbox_to_anchor=(1.25, 0.5), ncol=1)
+    plt.title(title)
+    plt.show()
+
+
+# tests label with FC value
+def UMAP_vis_top_500(embedding, y_train, title, rectangle=None):
+    top_500_indices = sorted(range(len(y_train)), key=lambda i: y_train[i])[-500:]
+    y_train_copy = y_train.copy()
+    y_train_copy[top_500_indices] = 1000
+
+    ax = sns.scatterplot(
+        x=embedding[:, 0], y=embedding[:, 1], hue=y_train_copy, alpha=0.1
+    )
+    if rectangle:
+        ax.add_patch(rectangle)
+
+    ax.legend(loc="center left", bbox_to_anchor=(1.25, 0.5), ncol=1)
+    plt.title(title)
+    plt.show()
 
 
 def UMAP_dual_vis(embedding, mdm2_y_raw, kde=False):
@@ -92,14 +128,14 @@ def UMAP_dual_vis(embedding, mdm2_y_raw, kde=False):
             x=embedding[mdm2_ranking][:, 0],
             y=embedding[mdm2_ranking][:, 1],
             color="blue",
-            label="MDM2 hotspot",
+            label="12ca5 hotspot",
             ax=ax,
         )
         sns.kdeplot(
             x=embedding[ca5_ranking][:, 0],
             y=embedding[ca5_ranking][:, 1],
             color="red",
-            label="12ca5 hotspot",
+            label="MDM2 hotspot",
             ax=ax,
         )
         sns.kdeplot(
@@ -115,7 +151,7 @@ def UMAP_dual_vis(embedding, mdm2_y_raw, kde=False):
             y=embedding[mdm2_ranking][:, 1],
             color="blue",
             alpha=0.1,
-            label="MDM2 hotspot",
+            label="12ca5 hotspot",
             ax=ax,
         )
         sns.scatterplot(
@@ -123,7 +159,7 @@ def UMAP_dual_vis(embedding, mdm2_y_raw, kde=False):
             y=embedding[ca5_ranking][:, 1],
             color="red",
             alpha=0.1,
-            label="12ca5 hotspot",
+            label="MDM2 hotspot",
             ax=ax,
         )
         sns.scatterplot(
@@ -157,6 +193,8 @@ def UMAP_binary_log_P(embedding, z_train, cutoff):
     ax = sns.scatterplot(
         x=embedding[:, 0], y=embedding[:, 1], hue=z_train > cutoff, alpha=0.1
     )
+    ax.legend(loc="center left", bbox_to_anchor=(1.25, 0.5), ncol=1)
+
     plt.title("RNN embedding UMAP, label with binary - log P value")
 
 
@@ -168,6 +206,8 @@ def UMAP_joint(embedding, y_train, z_train):
         hue=(y_train > 0) * (-z_train > -np.log10(0.05)),
         alpha=0.1,
     )
+    ax.legend(loc="center left", bbox_to_anchor=(1.25, 0.5), ncol=1)
+
     plt.title("RNN embedding UMAP, label with both log FC and - log P value")
 
 

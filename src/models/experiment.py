@@ -5,6 +5,7 @@ HOME_DIRECTORY = pathlib.Path().absolute()
 sys.path.append(str(HOME_DIRECTORY) + "/src")
 
 import os
+import pdb
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
@@ -16,10 +17,12 @@ from models.rnn import multi_channel_mse, p_value_rmse, fold_rmse, er_rmse
 from tensorflow.keras.utils import custom_object_scope
 from sklearn.preprocessing import StandardScaler
 
+
 @dataclass
 class Result:
     metrics: Any = None
     trained_model: Optional[Any] = None
+    y_pred_rescaled: Optional[np.array] = None
     y_pred: Optional[np.array] = None
     y_test: Optional[np.array] = None
     X_test: Optional[np.array] = None
@@ -27,7 +30,6 @@ class Result:
 
 
 class Experiment:
-
     def run_adhoc_experiment(
         self,
         X,
@@ -71,6 +73,7 @@ class Experiment:
             num_epochs=num_epochs,
         )
         y_pred, metrics = self.predict(model, X_test, y_test)
+        y_pred_rescaled = yscaler.inverse_transform(y_pred) if normalize else None
         return (
             split_datasets,
             Result(
@@ -78,21 +81,23 @@ class Experiment:
                 metrics=metrics,
                 y_pred=y_pred,
                 y_test=y_test,
+                yscaler=yscaler,
+                y_pred_rescaled=y_pred_rescaled,
             ),
         )
 
     def run_cross_validation_experiment(
-        self, 
-        X, 
-        y, 
-        model_architecture, 
-        optimizer, 
-        n_splits=5, 
-        load_trained_model=False, 
-        model_save_name=None, 
-        normalize=True, 
-        batch_size=128, 
-        num_epochs=5
+        self,
+        X,
+        y,
+        model_architecture,
+        optimizer,
+        n_splits=5,
+        load_trained_model=False,
+        model_save_name=None,
+        normalize=True,
+        batch_size=128,
+        num_epochs=5,
     ):
         kf = KFold(n_splits=n_splits)
         results = []
@@ -104,7 +109,6 @@ class Experiment:
                 yscaler.fit(y_train)
                 y_train_scaled = yscaler.transform(y_train)
                 y_test_saled = yscaler.transform(y_test)
-
             model = self.train(
                 X_train,
                 y_train_scaled,
@@ -116,11 +120,13 @@ class Experiment:
                 model_save_name=model_save_name + str(split_idx),
             )
             y_pred, metrics = self.predict(model, X_test, y_test_saled)
+            y_pred_rescaled = yscaler.inverse_transform(y_pred) if normalize else None
             results.append(
                 Result(
                     trained_model=model,
                     metrics=metrics,
                     y_pred=y_pred,
+                    y_pred_rescaled=y_pred_rescaled,
                     y_test=y_test,
                     X_test=X_test,
                     yscaler=yscaler,
@@ -140,6 +146,13 @@ class Experiment:
         model_save_name=None,
         num_epochs=20,
     ):
+        if model_architecture.func.__name__ != "ThreeChannelRegressionRNN_gelu":
+            X_train.reshape(X_train.shape[0], -1)
+            model = model_architecture().fit(
+                X_train.reshape(X_train.shape[0], -1), y_train
+            )
+            return model
+
         def scheduler(epoch, lr):
             if epoch < 5:
                 return lr
@@ -148,12 +161,14 @@ class Experiment:
 
         lr_scheduler = keras.callbacks.LearningRateScheduler(scheduler)
         es_scheduler = keras.callbacks.EarlyStopping(
-            monitor="multi_channel_mse", mode="min", verbose=1, patience=5, #restore_best_weights=True,
-
+            monitor="multi_channel_mse",
+            mode="min",
+            verbose=1,
+            patience=5,  # restore_best_weights=True,
         )
         if model_save_name is not None:
             mc_scheduler = keras.callbacks.ModelCheckpoint(
-                model_save_name, monitor="val_loss", mode="min", save_freq='epoch'
+                model_save_name, monitor="val_loss", mode="min", save_freq="epoch"
             )
         else:
             mc_scheduler = None
@@ -176,14 +191,14 @@ class Experiment:
             with custom_object_scope(
                 {
                     "multi_channel_mse": multi_channel_mse,
-                    "fold_rmse": fold_rmse,
-                    "p_value_rmse": p_value_rmse,
-                    "er_rmse": er_rmse,
+                    # "fold_rmse": fold_rmse,
+                    # "p_value_rmse": p_value_rmse,
+                    # "er_rmse": er_rmse,
                 }
             ):
                 model = keras.models.load_model(model_save_name)
         else:
-            model = model_architecture(optimizer)
+            model = model_architecture(optimizer, output_size=y_train.shape[1])
             model.fit(
                 x=X_train,
                 y=y_train,
@@ -201,10 +216,22 @@ class Experiment:
         return model
 
     def predict(self, model, X_test, y_true):
-        y_pred = model(X_test)
+        if isinstance(model, keras.models.Sequential):
+            y_pred = model(X_test)
+        else:
+            y_pred = model.predict(X_test.reshape(X_test.shape[0], -1))
+            y_pred = y_pred.reshape(y_true.shape)
         return y_pred, {
             "total_mse": multi_channel_mse(y_true, y_pred),
-            "p_value_rmse": p_value_rmse(y_true, y_pred),
-            "fold_rmse": fold_rmse(y_true, y_pred),
-            'er_rmse': er_rmse(y_true, y_pred),
+            # "p_value_rmse": p_value_rmse(y_true, y_pred),
+            # "fold_rmse": fold_rmse(y_true, y_pred),
+            # "er_rmse": er_rmse(y_true, y_pred),
         }
+
+
+def pval_filter_ranking_lambda(x):
+    return x[1] + x[2]
+    # if x[0] > - np.log(0.01): # else try 2 #- np.log(0.01):
+    #     return x[1] + x[2]
+    # else:
+    #     return 0

@@ -225,4 +225,4 @@ def build_joint_dataset(
     y_raw[:, 0] = -y_raw[:, 0]
 
     X, y_raw, peptides = shuffle(X, y_raw, peptides, random_state=0)
-    return X, y_raw, peptides
+    return X, y_raw, peptides, FEATURE_LIST

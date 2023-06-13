@@ -87,6 +87,8 @@ def shapley_analysis(
     aa_feature_dim=AA_FEATURE_DIM,
     peptide_dim=MAX_PEPTIDE_LEN,
     show_plot=True,
+    aggregation_func=lambda pred: pred[:, 0] + pred[:, 1] + pred[:, 2],
+    feature_list=None
 ):
     shap.initjs()
     investigate_X = np.array([x[0] for x in investigation_target])
@@ -100,8 +102,7 @@ def shapley_analysis(
 
     def f(X_sample):
         pred = model.predict(decode_X(X_sample))
-        # Multiply predicted FC confidence & predicted P-Value confidence
-        return pred[:,0] * pred[:, 1]
+        return aggregation_func(pred)
 
     def decode_X(X_sample):
         assert peptide_dim == int(X_sample.shape[1] / aa_feature_dim)
@@ -138,7 +139,7 @@ def shapley_analysis(
             shap_values.sum(),
         )
         pred = model(investigate_X)
-        print("Model eval: ", pred[:,0] * pred[:, 1])
+        print("Model eval: ",aggregation_func(pred))
         print(
             "Does this match the sum of shapely values + expected value (\Sum(phi_i) + phi_0)? ",
             shap_values.sum() + explainer.expected_value,
@@ -174,7 +175,7 @@ def shapley_analysis(
                 )
                 plt.xticks(np.asarray([i for i in range(len(peptide_aas))]), peptide_aas)
                 plt.show()
-        return attribution
+            return attribution
     else:
         if investigation_type == INVESTIGATION_TYPE.BY_FEATURE:
             max_display = aa_feature_dim
@@ -205,18 +206,6 @@ def shapley_analysis(
             feature_names=feature_names,
             instance_names=investigate_peptides,
         )
-        shap.summary_plot(explanation, features, cmap="plasma")
-
-        # Let's do some cohorting!
-        def cohort_analysis(max_cohorts):
-            shap.plots.bar(explanation.cohorts(max_cohorts).abs.mean(0))
-            print(
-                "\t" + str(max_cohorts) + " Cohort split: ",
-                {k: v[1] for (k, v) in auto_cohorts(explanation, max_cohorts).items()},
-            )
-
-        cohort_analysis(2)
-        cohort_analysis(3)
-        cohort_analysis(4)
-        cohort_analysis(5)
-        cohort_analysis(6)
+        if feature_list:
+            shap.summary_plot(explanation, features, feature_names=feature_list, cmap="plasma")
+        return explanation, features
