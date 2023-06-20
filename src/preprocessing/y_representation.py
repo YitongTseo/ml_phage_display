@@ -5,11 +5,10 @@ import scipy as sp
 import pdb
 
 REPLICATE_IDXS = (" 1", " 2", " 3")
-    
+ALL_PROTEINS = ["12ca5", "MDM2"]
 
-def formulate_two_channel_regression_labels(
-    lib, protein_of_interest, other_protein
-):
+
+def formulate_two_channel_regression_labels(lib, protein_of_interest, other_protein):
     lib["poi_log_fold"] = calculate_log_fold_across_proteins(
         lib, protein_of_interest, [other_protein]
     )
@@ -21,7 +20,7 @@ def formulate_two_channel_regression_labels(
     )
 
 def formulate_single_channel_regression_labels(lib, protein_of_interest):
-    all_proteins = ["12ca5", "MDM2", "mCDH2"]
+    all_proteins = ALL_PROTEINS.copy()
     all_proteins.remove(protein_of_interest)
     lib["poi_log_fold"] = calculate_log_fold_across_proteins(
         lib, protein_of_interest, all_proteins
@@ -29,9 +28,8 @@ def formulate_single_channel_regression_labels(lib, protein_of_interest):
     return lib["poi_log_fold"].to_numpy()
 
 
-
 def formulate_binary_classification_labels(lib, protein_of_interest):
-    all_proteins = ["12ca5", "MDM2", "mCDH2"]
+    all_proteins = ALL_PROTEINS.copy()
     all_proteins.remove(protein_of_interest)
     lib["poi_log_fold"] = calculate_log_fold_across_proteins(
         lib, protein_of_interest, all_proteins
@@ -39,7 +37,6 @@ def formulate_binary_classification_labels(lib, protein_of_interest):
     return np.array(list(lib["poi_log_fold"].apply(lambda e: e > 0)))
 
 
-# ["12ca5", "MDM2", "mCDH2"]
 def calculate_log_fold_across_proteins(
     lib,
     protein_of_interest,

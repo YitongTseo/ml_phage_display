@@ -71,11 +71,9 @@ def generate_weblogos_by_library(
 ):
     def peptide_passes(seq):
         cysteine_positions = [idx for idx, i in enumerate(seq) if i == "C"]
-        # We only want completely linear sequences (no Cysteines), X7 or X12, nothing else
-        # Or well behaving macrocylcles (only 2 Cysteines) Only AXNCXMC AXCXXXCXX AXCXXXXCX ACXXXXCXX AXCXXXXXC ACXXXXXXC ACXXXXXCX ACX7C SXCX7C
-        return (len(cysteine_positions) == 0 and (len(seq) == 7 or len(seq) == 12)) or (len(cysteine_positions) == 2 
-                    and (((len(seq) == 9 or len(seq) == 10) and seq.startswith('A')) 
-                        or (len(seq) == 11 and seq.startswith('S'))))
+        # We only want completely linear sequences (no Cysteines)
+        # Or well behaving macrocylcles (only 2 Cysteines)
+        return len(cysteine_positions) == 0 or len(cysteine_positions) == 2
 
     def get_library_name(seq):
         cysteine_positions = [idx for idx, i in enumerate(seq) if i == "C"]

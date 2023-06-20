@@ -3,10 +3,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 import pandas as pd
-import pdb
-
-# import scienceplots
-# plt.style.use([])# 'notebook']) #,'ieee'])
+from analysis.scatter_plots import (
+    plot_relations_in_3D,
+    plot_fancy_hexbin_relations,
+    plot_relations,
+)
+from tensorflow import keras
+from functools import partial
+from utils.utils import seed_everything
 
 
 def find_mdm2_motif(seq):
@@ -57,7 +61,7 @@ def plot_ratio_by_ranking(
     step_size=10,
     peptide_dataset_size=500,
     ylim=None,
-    save_file='mdm2_hit_rankings.csv',
+    save_file="hit_rankings.csv",
     plot=True,
 ):
     def compute_hit_ratios(
@@ -74,34 +78,27 @@ def plot_ratio_by_ranking(
             hit_indices = np.where(
                 [hit_detection_function(seq) for seq in top_peptides]
             )[0]
-
-            hit_ratio = len(hit_indices) / len(top_peptides)
             hits_by_size = np.concatenate(
                 (hits_by_size, np.array([(len(hit_indices), len(top_peptides))])),
                 axis=0,
             )
             area_under_curve += len(hit_indices) * step_size
-            # area_under_curve += hit_ratio * (
-            #     min(i + step_size, peptide_dataset_size) - i
-            # )
         return hits_by_size, area_under_curve
 
     # Plot theoretical hits:
-    all_mdm2_hits = [pep for pep in peptides if hit_rate_func(pep)]
-    dummy_optimal_mdm2_ranking = all_mdm2_hits + (
-        [""] * (len(peptides) - len(all_mdm2_hits))
-    )
-    theoretical_best_mdm2_ratios, theoretical_best_mdm2_auc = compute_hit_ratios(
-        dummy_optimal_mdm2_ranking,
+    all_hits = [pep for pep in peptides if hit_rate_func(pep)]
+    dummy_optimal_ranking = all_hits + ([""] * (len(peptides) - len(all_hits)))
+    theoretical_best_ratios, theoretical_best_auc = compute_hit_ratios(
+        dummy_optimal_ranking,
         hit_rate_func,
     )
     result_df = pd.DataFrame(
-        theoretical_best_mdm2_ratios,
+        theoretical_best_ratios,
         columns=["# Peptide", "Theoretical Best Ranking"],
     )
     plt.plot(
-        theoretical_best_mdm2_ratios[:, 1],
-        theoretical_best_mdm2_ratios[:, 0],
+        theoretical_best_ratios[:, 1],
+        theoretical_best_ratios[:, 0],
         "--",
         label="Theoretical Maximum",
         color="#929591",
@@ -115,19 +112,19 @@ def plot_ratio_by_ranking(
     markers = ["s", "*", "o", "^", "D"]
 
     for idx, (y_ranking, label, color) in enumerate(y_rankings):
-        sorted_mdm2_peptides = sort_peptides_by_model_ranking(peptides, y_ranking)
-        mdm2_hit_ratios, mdm2_auc = compute_hit_ratios(
-            sorted_mdm2_peptides,
+        sorted_peptides = sort_peptides_by_model_ranking(peptides, y_ranking)
+        hit_ratios, _auc = compute_hit_ratios(
+            sorted_peptides,
             hit_rate_func,
         )
-        mdm2_hits = [seq for seq in peptides if hit_rate_func(seq)]
-        normalized_auc = mdm2_auc / theoretical_best_mdm2_auc
-        result_df[label] = mdm2_hit_ratios[:, 0]
+        hits = [seq for seq in peptides if hit_rate_func(seq)]
+        normalized_auc = _auc / theoretical_best_auc
+        result_df[label] = hit_ratios[:, 0]
 
         plt.plot(
-            mdm2_hit_ratios[:, 1],
-            mdm2_hit_ratios[:, 0],
-            label=label +  "\nNormalized Hit Rate AUC: {0:.3f}".format(normalized_auc),
+            hit_ratios[:, 1],
+            hit_ratios[:, 0],
+            label=label + "\nNormalized Hit Rate AUC: {0:.3f}".format(normalized_auc),
             markevery=markers_on,
             color=color,
             alpha=0.8,
@@ -135,14 +132,13 @@ def plot_ratio_by_ranking(
         )
         if normalized_auc > best_curve_auc:
             best_curve_auc = normalized_auc
-            best_hit_ratios = mdm2_hit_ratios
+            best_hit_ratios = hit_ratios
 
     if ylim is None:
-        ylim = max(
+        ylim = min(
             [
-                600
-                # 1.2 * max(best_hit_ratios[:, 0]),
-                # 500
+                ylim if ylim is not None else np.inf,
+                1.2 * max(best_hit_ratios[:, 0]),
             ]
         )
     if save_file is not None:
@@ -166,39 +162,95 @@ def plot_ratio_by_ranking(
 
     return best_curve_auc
 
-    # print("mdm2 hits! ", mdm2_hits)
-    # print("12ca5 hits! ", ca5_hits)
 
-    # dummy_optimal_ca5_ranking = ca5_hits + ([""] * (len(peptides) - len(ca5_hits)))
-    # theoretical_best_ca5_ratios, theoretical_best_ca5_auc = compute_hit_ratios(
-    #     dummy_optimal_ca5_ranking,
-    #     seq_contains_12ca5_motif,
-    # )
+def benchmark_cross_validated_hit_rate(
+    cross_validation_results,
+    y_raw,
+    peptides,
+    proxy_ranking_lambda,
+    top_k_size,
+    motif_dectection_func,
+    calculate_proxy_uncertainty=False,
+    plot_x_idx=1,
+    plot_y_idx=0,
+    plot_confusion_results=False,
+):
+    seed_everything(0)
+    y_pred = np.vstack(result.y_pred_rescaled for result in cross_validation_results)
+    y_true = np.vstack(result.y_test for result in cross_validation_results)
+    # Check that the cross folds experiment returns our y_true in the same order as before
+    assert (y_true == y_raw).all()
 
-    # plt.plot(
-    #     theoretical_best_ca5_ratios[:, 1],
-    #     theoretical_best_ca5_ratios[:, 0],
-    #     ":",
-    #     label="Theoretical best discovery rate for 12ca5",
-    #     color="b",
-    #     alpha=0.5,
-    # )
-    # print("12ca5 area under curve: ", ca5_auc)
-    # print("normalized 12ca5 area under curve: ", ca5_auc / theoretical_best_ca5_auc)
+    all_positives = np.array(
+        [1.0 if motif_dectection_func(pep) else 0.0 for pep in peptides]
+    )
+    if calculate_proxy_uncertainty:
+        # Calculate with dropout on as proxy uncertainty
+        pred_100_fold = []
+        for result in cross_validation_results:
+            pred_100_fold.append(
+                np.array(
+                    [
+                        result.trained_model(result.X_test, training=True)
+                        for _ in range(100)
+                    ]
+                )
+            )
+        pred_100_fold = np.concatenate(pred_100_fold, axis=1)
 
-    # sns.set_style("darkgrid")
-    # plt.plot(
-    #     [0, peptide_dataset_size],
-    #     [0, peptide_dataset_size],
-    #     "--",
-    #     color="#929591",
-    #     label="Theoretical maximum",
-    # )
+        mean = np.mean(pred_100_fold, axis=0)
+        variance = np.std(pred_100_fold, axis=0)
+        uncertainty = np.mean(variance, axis=1)
 
-    # plt.plot(
-    #     ca5_hit_ratios[:, 1],
-    #     ca5_hit_ratios[:, 0],
-    #     label="12ca5 hits for motif DYX,\nwhere X is S,A",
-    #     color="b",
-    #     alpha=0.8,
-    # )
+        _ordering = [proxy_ranking_lambda(pred) for pred in mean]
+        y_pred = mean
+        if plot_confusion_results:
+            plot_relations_in_3D(
+                plot_x_idx,
+                plot_y_idx,
+                datapoints=mean,
+                title="Predicted Hits Coloring",
+                ordering=_ordering,
+                all_positives=all_positives,
+                uncertainty=uncertainty,
+            )
+    else:
+        _ordering = [proxy_ranking_lambda(pred) for pred in y_pred]
+        if plot_confusion_results:
+            plot_relations(
+                plot_x_idx,
+                plot_y_idx,
+                datapoints=y_pred,
+                ordering=_ordering,
+                all_positives=all_positives,
+                kind="scatter",
+            )
+    plot_fancy_hexbin_relations(
+        plot_x_idx,
+        plot_y_idx,
+        datapoints=y_pred,
+        ordering=_ordering,
+        all_positives=None,
+        line_color="#F94040",
+        vals=[
+            "Predicted -log(P-value)",
+            "Predicted log(Fold Change)",
+            "Predicted Enrichment Ratio",
+        ],
+        top_k=top_k_size,
+    )
+    plot_fancy_hexbin_relations(
+        plot_x_idx,
+        plot_y_idx,
+        datapoints=y_pred,
+        ordering=None,
+        all_positives=all_positives,
+        line_color="#F94040",
+        vals=[
+            "Predicted -log(P-value)",
+            "Predicted log(Fold Change)",
+            "Predicted Enrichment Ratio",
+        ],
+        top_k=top_k_size,
+    )
+    return _ordering, y_pred

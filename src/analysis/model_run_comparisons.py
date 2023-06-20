@@ -21,9 +21,6 @@ from sklearn.ensemble import RandomForestClassifier
 import copy
 
 
-"""
-These model calls shouldn't be housed here...
-"""
 
 
 def train_random_forest(X_train, y_train, X_test):

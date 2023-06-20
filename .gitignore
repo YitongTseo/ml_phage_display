@@ -1,10 +1,22 @@
-_*
-trained_models/
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
+_*
+comparison_models/*.h50
+comparison_models/*.h51
+comparison_models/*.h52
+comparison_models/*.h53
+comparison_models/*.h54
+comparison_models/*.h55
+comparison_models/*.h56
+comparison_models/*.h57
+comparison_models/*.h58
+comparison_models/*.h59
+*_models/*
+*_models_*/*
+*.csv
+*.pkl
 
 # C extensions
 *.so

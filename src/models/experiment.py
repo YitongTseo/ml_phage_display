@@ -191,9 +191,9 @@ class Experiment:
             with custom_object_scope(
                 {
                     "multi_channel_mse": multi_channel_mse,
-                    # "fold_rmse": fold_rmse,
-                    # "p_value_rmse": p_value_rmse,
-                    # "er_rmse": er_rmse,
+                    "fold_rmse": fold_rmse,
+                    "p_value_rmse": p_value_rmse,
+                    "er_rmse": er_rmse,
                 }
             ):
                 model = keras.models.load_model(model_save_name)
@@ -207,7 +207,6 @@ class Experiment:
                 epochs=num_epochs,
                 verbose="auto",
                 initial_epoch=0,
-                # class_weight={1: 0.5, 0: 0.5},
                 validation_freq=1,
                 use_multiprocessing=False,
                 callbacks=[lr_scheduler, es_scheduler]

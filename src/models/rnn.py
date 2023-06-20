@@ -56,7 +56,7 @@ def ThreeChannelRegressionRNN_gelu(
     model.add(layers.Activation(activation_func))
     model.add(layers.Dropout(dropout))
 
-    for depth_idx in range(depth - 6):
+    for _idx in range(depth - 6):
         model.add(layers.Dense(width, kernel_initializer="he_uniform"))
         model.add(layers.BatchNormalization())
         model.add(layers.Activation(activation_func))
