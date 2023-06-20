@@ -15,7 +15,6 @@ comparison_models/*.h58
 comparison_models/*.h59
 *_models/*
 *_models_*/*
-*.csv
 *.pkl
 
 # C extensions
