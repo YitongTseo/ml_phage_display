@@ -66,3 +66,66 @@ def calculate_log_p_value(lib, protein_of_interest, other_protein):
     ).pvalue
     lib["log_pvalues"] = lib["pvalues"].apply(np.log)
     return lib["log_pvalues"]
+
+
+def calculate_er_values(
+    protein_of_interest,
+    round_datafiles=[
+        "data/12ca5-MDM2-R1.csv",
+        "data/12ca5-MDM2-R2.csv",
+        "data/12ca5-MDM2-R3.csv",
+    ],
+    save_output=True,
+):
+    """
+        Refer to the equation defined in https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9872955/
+    """
+    round_dfs = [pd.read_csv(round_datafile) for round_datafile in round_datafiles]
+
+    cols = [f"{protein_of_interest}{replicate_idx}" for replicate_idx in REPLICATE_IDXS]
+
+    # TODO: this will break with replicates > 3
+    for round_idx, df in enumerate(round_dfs):
+        df[f"{protein_of_interest} sum"] = df[cols].sum(axis=1) 
+        df = df[["Peptide", f"{protein_of_interest} sum"]]
+        round_dfs[round_idx] = df
+
+    # Merge and drop duplicates for all DataFrames in (reversed!) round_dfs
+    # TODO: this will break for any protein with > 3 rounds...
+    df_merged = reduce(
+        lambda left, right: pd.merge(left, right, on="Peptide", how="left"),
+        round_dfs[::-1],
+    )
+    df_merged = df_merged.drop_duplicates(subset=["Peptide"])
+    df_merged = df_merged.reset_index(drop=True)
+
+    # Make sure every cell is not NaN, and add a 1 to every cell.
+    df_merged = df_merged.fillna(0)
+    numerical_cols = df_merged.select_dtypes(include="number").columns
+    df_merged[numerical_cols] = df_merged[numerical_cols] # .add(1.0)
+
+    # TODO: this will break for any protein with > 3 rounds...
+    df_merged[f"{protein_of_interest} sum_x"] = df_merged[
+        f"{protein_of_interest} sum_x"
+    ] / (df_merged[f"{protein_of_interest} sum_x"].sum())
+    df_merged[f"{protein_of_interest} sum_y"] = df_merged[
+        f"{protein_of_interest} sum_y"
+    ] / (df_merged[f"{protein_of_interest} sum_y"].sum())
+    df_merged[f"{protein_of_interest} sum"] = df_merged[
+        f"{protein_of_interest} sum"
+    ] / (df_merged[f"{protein_of_interest} sum"].sum())
+
+    df_merged["ER"] = (
+        np.log2(
+            (df_merged[f"{protein_of_interest} sum_x"]
+            / (df_merged[f"{protein_of_interest} sum_y"]))
+        )
+    ) + (
+        np.log2(
+            (df_merged[f"{protein_of_interest} sum_y"])
+            / (df_merged[f"{protein_of_interest} sum"])
+        )
+    )
+    if save_output:
+        df_merged.to_csv(f"{protein_of_interest}_merged_ER.csv")
+    return df_merged
