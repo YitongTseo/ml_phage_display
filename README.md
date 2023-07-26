@@ -6,3 +6,5 @@ To setup:
 
 To run simply jump right into the existing .ipynb notebooks. 
 Either use the trained models in /final_models or train your own models with your own dataset by editing the dataset name and model save path in F3_Hit_Rate_Benchmarking.ipynb and hitting run.
+
+The ER datafiles (if not present) will be generated upon the first run
